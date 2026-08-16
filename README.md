@@ -1,93 +1,103 @@
-# PetroProcess Suite — Scalable Streamlit Calculation Platform
+# Paras Chemical Engineering Calc Suite
 
-Enterprise-grade, multi-page Streamlit suite architected to scale to
-**500+ calculation tools** without code bloat, via a Dynamic
-Dictionary-Registry pattern. This deliverable includes the complete
-foundational architecture plus **3 fully implemented, tested
-calculators** in the Fluid Dynamics domain.
+Enterprise-grade rebuild matching the "Paras Chemical Engineering Calc
+Suite" branding and requirements: SaaS-grade UI (hidden Streamlit
+chrome, navy/slate theme), a persistent global SI/Imperial unit toggle,
+sensible non-zero defaults, dropdown material databases, categorized
+tabs, and a PDF/CSV "Generate Design Report" export — on top of the
+existing scalable Dynamic Registry architecture.
 
-## Verified working
+## What's new vs. the previous `petro_calc_suite` delivery
 
-- Every file parses cleanly (`ast.parse`, 0 syntax errors across 14 files).
-- All 3 calculation engines tested directly with real inputs — results
-  cross-checked against the earlier JS/Python toolkit versions (e.g.
-  liquid valve Cv = 21.213, matching prior verified output exactly).
-- The app was **actually launched** (`streamlit run app.py`) and
-  confirmed to boot and serve HTTP 200 with a clean log — not just
-  syntax-checked.
+| Requirement | Implementation |
+|---|---|
+| Hidden Streamlit menu/footer, corporate theme | `utils/styling.py` - `#MainMenu`, `footer`, toolbar all hidden; navy/slate/blue palette |
+| Branding placeholders (logo + header) | `render_brand_header()` - gradient badge + suite name, sidebar (compact) and main page |
+| Tabs to avoid scroll fatigue | Domain pages use `st.tabs()` per tool category, not one long scroll |
+| Global SI/Imperial toggle | `utils/unit_system.py` - `st.session_state`-backed, persists across every page/rerun |
+| Global search (all 50+ tools, live or planned) | `calculators/tool_roadmap.py` + `app.py` sidebar search - searches the full 51-tool roadmap, flags Live vs Coming Soon |
+| Non-zero, realistic defaults | Every `InputSpec.default` is a working value (e.g. water at 998 kg/m3, not 0.0) |
+| Material dropdowns | Water Hammer tool's pipe-material selector (Steel/Ductile Iron/Copper/PVC/HDPE) pulls real elastic modulus values, not manual entry |
+| PDF/CSV Design Report export | `utils/report.py` - `render_report_widget()`, dropped into every tool page next to the email widget |
+| Two fully-coded complex tools | **Shortcut Distillation (Fenske-Underwood-Gilliland)** and **Water Hammer & Surge Pressure** - both below |
 
-## Architecture — how this scales to 500+ tools
+## The two flagship tools
 
+### Shortcut Distillation (Fenske-Underwood-Gilliland)
+`calculators/distillation_engine.py` - combines all three correlations
+into one design sequence (Fenske -> Nmin, Underwood -> Rmin, Gilliland ->
+actual N at your chosen reflux), since that's how an engineer actually
+runs a FUG short-cut in practice. Includes an automatic warning if R/Rmin
+is uneconomically close to 1.0 or unusually high above the typical 1.1-1.5
+optimum range.
+
+### Water Hammer & Surge Pressure Peak Analysis
+`calculators/fluid_dynamics_engine.py` - Joukowsky surge pressure with
+the **Korteweg wave-speed correction** for pipe wall elasticity (a
+material dropdown drives the elastic modulus), plus an **Allievi rapid-
+vs-slow closure check**: compares the actual valve closure time against
+the pipe's critical reflection time (2L/a) and applies the correct
+formula branch, flagging rapid closures as a cavitation/surge risk.
+
+## Verification - this was actually run, not just written
+
+This is the important part given how much surface area a UI framework
+like this has for silent breakage:
+
+1. **Standalone function tests** - every `compute_*` function called
+   directly with real numbers; Shortcut Distillation matched the earlier
+   verified toolkit exactly (Nmin=7.49, Rmin=1.24); Water Hammer checked
+   for physical sanity (steel wave speed 1303 m/s vs HDPE 188 m/s - softer
+   pipe correctly gives slower wave speed / lower surge).
+2. **PDF generation crash found and fixed** - the initial `utils/report.py`
+   crashed on the first real run because fpdf2's base Helvetica font is
+   latin-1 only and the suite's formulas are full of unicode (Delta, deg,
+   sqrt, em-dash). Added a sanitizer and re-verified with the actual
+   unicode strings used elsewhere in the app, not a sanitized test string.
+3. **App actually launched** - `streamlit run app.py`, confirmed HTTP 200
+   with a clean boot log.
+4. **Streamlit's official `AppTest` framework used to simulate real user
+   interaction** - not just "does it parse":
+   - Landing page: loaded, correctly reports 5/51 tools live.
+   - Fluid Dynamics page: **a real bug was caught and fixed here** - a
+     classic Python closure late-binding bug in the tab/selectbox loop
+     (`format_func=lambda k: tool_titles[k]` captured the loop variable
+     by reference, so every tab's dropdown ended up using the *last*
+     tab's title mapping once actually invoked, crashing with a
+     `ValueError` the moment more than one category tab existed). Fixed
+     via the standard default-argument binding trick
+     (`lambda k, _titles=tool_titles: _titles[k]`), then **re-tested and
+     confirmed all 3 Fluid Dynamics tabs' Calculate buttons work
+     correctly**, including explicitly switching to and running the
+     Water Hammer tool through the actual rendered dropdown+button flow.
+   - Distillation page: Calculate button clicked, correct FUG results
+     rendered as `st.metric` cards.
+   - Both stub pages (Heat Transfer, Operations Analytics) load without
+     error.
+   - Confirmed the CSV/PDF download buttons build their file data without
+     exception inside the live app context (not just the standalone
+     report module test).
+
+This is worth being direct about: the closure bug would **not** have
+been caught by syntax checking or by running each `compute_*` function
+in isolation - it only shows up when the actual Streamlit widget tree is
+exercised with more than one tab. That's why the `AppTest` pass mattered
+here, not just as a formality.
+
+## File structure
+
+Same as `petro_calc_suite`, plus:
 ```
-petro_calc_suite/
-├── app.py                          # Landing page + global master search index
-├── requirements.txt
+paras_calc_suite/
 ├── utils/
-│   ├── conversions.py               # SI <-> Imperial unit conversion functions
-│   ├── validators.py                # Physical-limit input validation (ValidationResult)
-│   ├── mailer.py                    # SMTP email report dispatcher + Streamlit widget
-│   └── styling.py                   # Slate/navy industrial theme + shared UI helpers
+│   ├── unit_system.py     # NEW - SI/Imperial toggle + NPS/DN pipe size tables
+│   └── report.py           # NEW - CSV/PDF design report generator
 ├── calculators/
-│   ├── registry_base.py             # ToolSpec / InputSpec — the core scaling pattern
-│   ├── fluid_dynamics_engine.py     # Tools #1-75 — 3 FULLY IMPLEMENTED + registry pattern
-│   ├── distillation_engine.py       # Tools #76-150 — stubbed, ready for population
-│   ├── heat_transfer_engine.py      # Tools #151-225 — stubbed
-│   └── operations_analytics_engine.py  # Tools #426-500 — stubbed
-└── pages/
-    ├── 1_🌊_Fluid_Dynamics.py        # Dynamic UI loader — zero tool-specific code
-    ├── 2_⚗️_Distillation.py
-    ├── 3_🔥_Heat_Transfer.py
-    └── 4_📊_Operations_Analytics.py
+│   └── tool_roadmap.py     # NEW - static 51-tool roadmap, cross-referenced for Live/Coming Soon
 ```
-
-### The core pattern: `ToolSpec` + `REGISTRY`
-
-Every calculation tool is defined **once**, in its domain's `*_engine.py`
-file, as:
-1. A pure `compute_xxx(values: dict) -> dict` function — no Streamlit
-   code, just math + validation. Easy to unit-test in isolation (see
-   the verification commands below).
-2. A `ToolSpec` — a declarative bundle of `InputSpec` objects (label,
-   default, min/max, unit), the `compute` function reference, and
-   documentation metadata (formula, standard references, assumptions).
-
-The domain's `REGISTRY: dict[str, ToolSpec]` collects these. The page
-file (`pages/1_🌊_Fluid_Dynamics.py`) then **never contains any
-tool-specific code** — it:
-- lists `REGISTRY.keys()` in a selectbox (grouped by `category`),
-- generically renders one `st.number_input` per `InputSpec`,
-- calls `tool.compute(values)`,
-- renders results via `st.metric`,
-- renders the "📚 Engineering Basis & Limitations" expander from
-  `tool.formula_md` / `references` / `assumptions`,
-- renders the email-report widget.
-
-**Adding tool #501 means:** write one `compute_xxx()` function, one
-`ToolSpec`, add it to `REGISTRY`. Nothing else changes — not the page,
-not `app.py`, not the styling. This is what prevents 500 tools from
-becoming 500 hardcoded `if/else` blocks or 500 near-duplicate page files.
-
-### Global search
-
-`app.py` merges every domain's `REGISTRY` into one flat `MASTER_INDEX`
-and powers a sidebar search box that matches on title/description/
-category across all domains at once — regardless of which page a tool's
-UI actually lives on.
-
-## The 3 fully implemented calculators (Fluid Dynamics)
-
-1. **Single-Phase Pressure Drop** — Darcy-Weisbach with the Swamee-Jain
-   explicit friction factor approximation (avoids the iterative solve,
-   matches the prompt's specified method exactly).
-2. **Control Valve Sizing (Cv)** — split into liquid and gas/vapor
-   variants per ISA-75.01, both with choked-flow detection.
-3. **NPSH Available vs. Required** — margin check with a configurable
-   target and an automatic cavitation-risk warning.
-
-Each has a full "📚 Engineering Basis & Limitations" expander citing
-real standards (ISA-75.01, GPSA, Crane TP-410, Hydraulic Institute
-ANSI/HI 9.6.1, API 610) and stated assumptions/limitations — not generic
-placeholder text.
+`fluid_dynamics_engine.py` gained the Water Hammer tool (`fd_006`).
+`distillation_engine.py` gained Shortcut Distillation (`mt_011`), was
+previously an empty stub.
 
 ## Running it
 
@@ -96,46 +106,24 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Email setup (optional)
+## Extending toward 50+ / 500+ tools
 
-Create `.streamlit/secrets.toml`:
-```toml
-[smtp]
-host = "smtp.gmail.com"
-port = 587
-username = "your_email@gmail.com"
-password = "your_app_password"
-sender_name = "PetroProcess Suite"
-```
-(For Gmail, use an [App Password](https://myaccount.google.com/apppasswords),
-not your regular password.) Without this configured, the "Send Report"
-button will show a clear message telling the user email isn't set up
-yet, rather than failing silently.
+Identical pattern to before - see the earlier README's "Extending"
+section. The one addition: also add a `RoadmapEntry` to
+`calculators/tool_roadmap.py` with a matching `key` so the new tool shows
+as "Live" in search and the tabbed roadmap view automatically.
 
-## Extending toward 500+ tools
+## Known scope limits (stated plainly)
 
-1. Open (or create) the relevant `calculators/*_engine.py`.
-2. Write `compute_yourtool(values: dict) -> dict` — pure function,
-   validate inputs via `utils/validators.py` helpers, raise `ValueError`
-   with a clear message on invalid input.
-3. Define a `ToolSpec` with its `InputSpec` list and documentation.
-4. Add it to that engine's `REGISTRY` dict.
-5. Done — it will appear in its domain page's selectbox and in global
-   search automatically. No other file needs to change.
-
-## Verification commands (for maintainers)
-
-```bash
-# Syntax-check every file
-python3 -c "import ast; [ast.parse(open(f, encoding='utf-8').read()) for f in [...]]"
-
-# Test the calculation engines directly (no Streamlit needed)
-python3 -c "
-from calculators.fluid_dynamics_engine import compute_valve_cv_liquid
-print(compute_valve_cv_liquid({'flow':150,'p1':150,'p2':100,'sg':1.0,'pv':0.5,'pc':3208,'fl':0.9}))
-"
-
-# Confirm the app actually boots
-streamlit run app.py --server.headless true &
-curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8501
-```
+- Only 2 of the 51 roadmap tools have real calculation logic behind them
+  (Shortcut Distillation, Water Hammer) plus the 3 carried over from the
+  prior delivery (Pressure Drop, Control Valve Liquid/Gas, NPSH) - 5
+  live total. The other 46 are roadmap placeholders with titles only, by
+  design, matching the "architect the framework, then write the
+  calculation logic for the prioritized tools" instruction.
+- Email sending requires SMTP secrets to be configured (unchanged from
+  before) - untested end-to-end since that requires real credentials,
+  but the failure path (missing secrets) was verified to show a clear
+  message rather than crash.
+- PDF/CSV export tested for successful generation, not for exact visual
+  layout fidelity across all possible result value types.

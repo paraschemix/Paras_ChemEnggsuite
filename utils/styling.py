@@ -23,6 +23,14 @@ def inject_global_css() -> None:
     st.markdown(
         f"""
         <style>
+        /* ---------- Hide default Streamlit chrome for a SaaS feel ---------- */
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        header[data-testid="stHeader"] {{background: transparent;}}
+        div[data-testid="stToolbar"] {{visibility: hidden; height: 0; position: fixed;}}
+        div[data-testid="stDecoration"] {{visibility: hidden; height: 0; position: fixed;}}
+        div[data-testid="stStatusWidget"] {{visibility: hidden; height: 0; position: fixed;}}
+
         /* ---------- App background & base typography ---------- */
         .stApp {{
             background-color: {SLATE_BG};
@@ -40,6 +48,24 @@ def inject_global_css() -> None:
         }}
         section[data-testid="stSidebar"] input {{
             color: #0f172a !important;
+        }}
+
+        /* ---------- Brand header block ---------- */
+        .brand-header {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 0 14px 0;
+            border-bottom: 1px solid #334155;
+            margin-bottom: 14px;
+        }}
+        .brand-logo-badge {{
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, {ACCENT_BLUE}, {PRIMARY_NAVY});
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; font-weight: 800; color: white;
+            flex-shrink: 0;
         }}
 
         /* ---------- Headers ---------- */
@@ -72,7 +98,7 @@ def inject_global_css() -> None:
         }}
 
         /* ---------- Buttons ---------- */
-        .stButton > button {{
+        .stButton > button, .stDownloadButton > button {{
             background-color: {ACCENT_BLUE};
             color: white;
             font-weight: 600;
@@ -80,9 +106,18 @@ def inject_global_css() -> None:
             border: none;
             padding: 0.5rem 1.2rem;
         }}
-        .stButton > button:hover {{
+        .stButton > button:hover, .stDownloadButton > button:hover {{
             background-color: {PRIMARY_NAVY};
             color: white;
+        }}
+
+        /* ---------- Tabs ---------- */
+        button[data-baseweb="tab"] {{
+            font-weight: 600;
+            color: #475569;
+        }}
+        button[data-baseweb="tab"][aria-selected="true"] {{
+            color: {ACCENT_BLUE};
         }}
 
         /* ---------- Expanders (Engineering Basis panels) ---------- */
@@ -106,7 +141,43 @@ def inject_global_css() -> None:
             border-radius: 8px;
             overflow: hidden;
         }}
+
+        /* ---------- Status pill badges (Live / Coming Soon) ---------- */
+        .status-live {{
+            background: #dcfce7; color: #166534; font-size: 0.7rem; font-weight: 700;
+            padding: 2px 8px; border-radius: 9999px; display: inline-block;
+        }}
+        .status-soon {{
+            background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 700;
+            padding: 2px 8px; border-radius: 9999px; display: inline-block;
+        }}
         </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_brand_header(compact: bool = False) -> None:
+    """
+    Sidebar (or main-page, if compact=False and called outside the
+    sidebar) branding block: logo badge + suite name. Replace the badge
+    text/gradient with an actual <img> tag once a real logo asset exists
+    — this is a clearly-marked placeholder per the branding requirement.
+    """
+    target = st.sidebar if compact else st
+    target.markdown(
+        f"""
+        <div class="brand-header">
+            <div class="brand-logo-badge">P</div>
+            <div>
+                <div style="font-weight:800;font-size:{'0.95rem' if compact else '1.4rem'};color:{'#e2e8f0' if compact else PRIMARY_NAVY};">
+                    Paras Chemical Engineering
+                </div>
+                <div style="font-size:0.75rem;color:{'#94a3b8' if compact else '#64748b'};">
+                    Calc Suite &middot; Enterprise Edition
+                </div>
+            </div>
+        </div>
         """,
         unsafe_allow_html=True,
     )
