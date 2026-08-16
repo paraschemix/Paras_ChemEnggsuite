@@ -315,9 +315,159 @@ TOOL_NPSH = ToolSpec(
 
 
 # =======================================================================
+# TOOL 6: WATER HAMMER & SURGE PRESSURE PEAK ANALYSIS (Joukowsky)
+# =======================================================================
+
+# Modulus of elasticity (E) by pipe material, Pa. Used to compute the
+# pressure-wave speed via the Korteweg formula (accounts for pipe wall
+# elasticity reducing the effective wave speed vs. rigid-pipe acoustic
+# velocity).
+PIPE_MATERIAL_E_PA = {
+    "Steel": 200e9,
+    "Ductile Iron": 166e9,
+    "Copper": 117e9,
+    "PVC": 3.0e9,
+    "HDPE": 0.9e9,
+}
+
+
+def compute_water_hammer(values: dict) -> dict:
+    """
+    Joukowsky surge pressure with the Korteweg wave-speed correction for
+    pipe wall elasticity, plus a rapid-vs-slow valve closure check
+    (Allievi criterion: instantaneous-closure formula only applies when
+    actual closure time <= critical/reflection time 2L/a).
+
+    Internal units: SI (Pa, m, m/s, kg/m3) — results converted to psi/
+    bar for display, matching the rest of the suite's convention.
+    """
+    rho = values["fluid_density"]              # kg/m3
+    bulk_modulus = values["bulk_modulus"] * 1e9  # input in GPa -> Pa
+    material = values["pipe_material"]
+    diameter_mm = values["diameter_mm"]
+    wall_thickness_mm = values["wall_thickness_mm"]
+    velocity_change = values["velocity_change"]  # m/s
+    pipe_length_m = values["pipe_length"]         # m
+    closure_time_s = values["closure_time"]       # s
+    static_pressure_kpa = values["static_pressure"]  # kPa
+
+    has_error, has_warning, errors, warnings = run_validators(
+        check_positive(rho, "Fluid density"),
+        check_positive(bulk_modulus, "Bulk modulus"),
+        check_positive(diameter_mm, "Pipe diameter"),
+        check_positive(wall_thickness_mm, "Wall thickness"),
+        check_positive(pipe_length_m, "Pipe length"),
+        check_positive(closure_time_s, "Closure time"),
+    )
+    if has_error:
+        raise ValueError("; ".join(errors))
+    if velocity_change <= 0:
+        raise ValueError("Velocity change must be greater than zero (the flow velocity being arrested).")
+
+    e_pipe = PIPE_MATERIAL_E_PA.get(material)
+    if e_pipe is None:
+        raise ValueError(f"Unknown pipe material: {material}")
+
+    d_m = diameter_mm / 1000.0
+    e_wall_m = wall_thickness_mm / 1000.0
+
+    # Korteweg wave speed (m/s) — c1 (pipe restraint factor) taken as 1.0
+    # (typical assumption for a pipe anchored throughout its length).
+    a = math.sqrt(
+        (bulk_modulus / rho) / (1 + (bulk_modulus * d_m) / (e_pipe * e_wall_m))
+    )
+
+    # Critical (pipe reflection) time — the threshold between "rapid"
+    # (instantaneous-equivalent) and "slow" valve closure, per the
+    # Allievi/Joukowsky criterion.
+    t_critical = (2 * pipe_length_m) / a
+    is_rapid_closure = closure_time_s <= t_critical
+
+    # Joukowsky surge pressure (full, instantaneous-closure case)
+    dp_joukowsky_pa = rho * a * velocity_change
+
+    if is_rapid_closure:
+        dp_surge_pa = dp_joukowsky_pa
+    else:
+        # Standard engineering approximation for slow closure: surge
+        # pressure scales down roughly linearly with (t_critical / t_closure).
+        dp_surge_pa = dp_joukowsky_pa * (t_critical / closure_time_s)
+
+    dp_surge_kpa = dp_surge_pa / 1000.0
+    dp_surge_psi = dp_surge_pa / 6894.757
+    peak_pressure_kpa = static_pressure_kpa + dp_surge_kpa
+
+    extra_warnings = []
+    if is_rapid_closure:
+        extra_warnings.append(
+            f"Closure time ({closure_time_s:.3f}s) is at or below the critical reflection time "
+            f"({t_critical:.3f}s) - this is a RAPID closure. Full Joukowsky surge pressure applies; "
+            "consider a slower valve/actuator or a surge relief device if this pressure is unacceptable."
+        )
+
+    return {
+        "Pressure Wave Speed 'a' (m/s)": round(a, 1),
+        "Critical (Reflection) Time (s)": round(t_critical, 3),
+        "Closure Type": "RAPID (full Joukowsky)" if is_rapid_closure else "Slow (attenuated surge)",
+        "Surge Pressure Rise (kPa)": round(dp_surge_kpa, 1),
+        "Surge Pressure Rise (psi)": round(dp_surge_psi, 1),
+        "Peak Pressure (Static + Surge, kPa)": round(peak_pressure_kpa, 1),
+        "_warnings": warnings + extra_warnings,
+    }
+
+
+TOOL_WATER_HAMMER = ToolSpec(
+    key="fd_006",
+    title="Water Hammer & Surge Pressure Peak Analysis",
+    category="Piping Hydraulics",
+    description="Joukowsky surge pressure with Korteweg wave-speed correction and rapid/slow valve-closure check.",
+    inputs=[
+        InputSpec("fluid_density", "Fluid Density", default=998.0, min_value=1.0, unit="(kg/m3)"),
+        InputSpec("bulk_modulus", "Fluid Bulk Modulus", default=2.15, min_value=0.01, unit="(GPa)",
+                   help="Water at ambient conditions: ~2.15 GPa."),
+        InputSpec("pipe_material", "Pipe Material", default=0.0, input_type="select",
+                   options=list(PIPE_MATERIAL_E_PA.keys())),
+        InputSpec("diameter_mm", "Pipe Internal Diameter", default=150.0, min_value=1.0, unit="(mm)"),
+        InputSpec("wall_thickness_mm", "Pipe Wall Thickness", default=6.0, min_value=0.5, unit="(mm)"),
+        InputSpec("velocity_change", "Velocity Change (arrested flow)", default=2.0, min_value=0.01, unit="(m/s)"),
+        InputSpec("pipe_length", "Pipe Length (source to valve)", default=500.0, min_value=1.0, unit="(m)"),
+        InputSpec("closure_time", "Valve Closure Time", default=0.3, min_value=0.001, unit="(s)",
+                   help="Time for the valve to fully close. Compare against the calculated critical (reflection) time to see whether this counts as 'rapid' closure."),
+        InputSpec("static_pressure", "Static Operating Pressure", default=500.0, min_value=0.0, unit="(kPa)"),
+    ],
+    compute=compute_water_hammer,
+    formula_md=(
+        r"**Korteweg wave speed** (accounts for pipe wall elasticity):"
+        "\n\n"
+        r"$$a = \sqrt{\dfrac{K/\rho}{1 + \dfrac{K \cdot D}{E \cdot e}}}$$"
+        "\n\n**Critical (reflection) time:**"
+        "\n\n"
+        r"$$t_c = \dfrac{2L}{a}$$"
+        "\n\n**Joukowsky surge pressure** (rapid closure, $t_{close} \\leq t_c$):"
+        "\n\n"
+        r"$$\Delta P = \rho \cdot a \cdot \Delta v$$"
+        "\n\nFor slow closure ($t_{close} > t_c$), surge pressure is approximated as "
+        r"$\Delta P \times (t_c/t_{close})$ — a standard linear-attenuation engineering approximation."
+    ),
+    references=[
+        "Wylie, E.B. & Streeter, V.L., *Fluid Transients in Systems*",
+        "AWWA Manual M11 — Steel Pipe: A Guide for Design and Installation",
+        "Parmakian, J., *Waterhammer Analysis*",
+    ],
+    assumptions=[
+        "Pipe restraint factor c1 = 1.0 (fully anchored/restrained pipe) — unrestrained or partially restrained pipe reduces effective wave speed further.",
+        "Slow-closure surge attenuation uses the common linear (t_c/t_close) approximation, not a full method-of-characteristics transient solution — for critical/high-consequence lines, run a full transient (surge) analysis.",
+        "Single, uniform pipe segment (no branches, no elevation profile, no air valves/surge vessels modeled).",
+        "Instantaneous full velocity arrest assumed for Delta-v — partial closures need the actual achieved velocity change.",
+    ],
+)
+
+
+# =======================================================================
 # REGISTRY — tools #1-75 for the Fluid Dynamics domain.
-# Only 3 are populated below; tools #4-75 follow the identical pattern:
-# define compute_xxx(values) -> dict, then a ToolSpec, then add it here.
+# Only a subset are populated below; the rest follow the identical
+# pattern: define compute_xxx(values) -> dict, then a ToolSpec, then add
+# it here.
 # =======================================================================
 
 REGISTRY: dict[str, ToolSpec] = {
@@ -325,7 +475,8 @@ REGISTRY: dict[str, ToolSpec] = {
     TOOL_VALVE_LIQUID.key: TOOL_VALVE_LIQUID,
     TOOL_VALVE_GAS.key: TOOL_VALVE_GAS,
     TOOL_NPSH.key: TOOL_NPSH,
-    # TOOL_4.key: TOOL_4,   # <-- e.g. "Erosional Velocity (API RP 14E)"
-    # TOOL_5.key: TOOL_5,   # <-- e.g. "Two-Phase Flow Regime Map"
+    TOOL_WATER_HAMMER.key: TOOL_WATER_HAMMER,
+    # TOOL_4.key: TOOL_4,   # <-- e.g. "Two-Phase Pressure Drop (Lockhart-Martinelli)"
+    # TOOL_5.key: TOOL_5,   # <-- e.g. "Compressor Polytropic/Isentropic Head"
     # ... up to fd_075
 }
