@@ -1,0 +1,25 @@
+# Paras Chemical Engineering Calc Suite - AI Agent Guidelines
+
+1. CODE STRUCTURE:
+ - Every tool must be a single isolated Python file placed in the appropriate `tools/dom_XX/` directory.
+ - Every tool MUST export a `run()` function that Streamlit calls.
+
+2. UI & UNITS:
+ - Import `from core.unit_converter import unit_scaler` when available.
+ - Read `st.session_state.get('unit_system', 'SI')` to render correct input labels and default values.
+ - Always display pipe diameters in inches (NPS) under Imperial.
+ - Never use 0.0 as default for absolute roughness, density, or viscosity.
+
+3. OUTPUT FORMATTING:
+ - Display key engineering results using `st.metric()`.
+ - Include intermediate variables (e.g., Reynolds Number, Friction Factor) in an expandable section.
+ - Include references to standards (API, ISA, GPSA, Perry's).
+
+4. TESTING & CI:
+ - Add unit tests for core compute_* functions and key edge cases.
+ - New tools must include at least one pytest unit test in `tests/tools/` referencing deterministic inputs.
+
+5. SAFETY & STABILITY:
+ - Avoid global side-effects on import; computations must execute in `run()`.
+ - Use robust input validation and clear user-facing error messages.
+ - Keep UI logic and computation logic separated (helper functions for math, `run()` only orchestrates UI + call).
