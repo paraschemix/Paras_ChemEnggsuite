@@ -80,11 +80,20 @@ for tab, category in zip(category_tabs, sorted(categories.keys())):
         calculate = st.button("🧮 Calculate", type="primary", key=f"{tool.key}_calc_btn")
 
         # ---------------------------------------------------------
-        # Generic compute + result rendering
+        # Generic compute + result rendering (with input-result caching)
         # ---------------------------------------------------------
+        @st.cache_data
+        def _cached_compute(spec_key: str, inputs_items: tuple) -> dict:
+            # inputs_items is a tuple of (key, value) pairs sorted — reconstruct dict
+            inputs = dict(inputs_items)
+            spec = REGISTRY[spec_key]
+            return spec.compute(inputs)
+
         if calculate:
             try:
-                results = tool.compute(values)
+                # Use a stable, hashable cache key derived from sorted input items
+                cache_key = tuple(sorted(values.items()))
+                results = _cached_compute(tool.key, cache_key)
                 warnings = results.pop("_warnings", [])
 
                 st.markdown("#### Results")

@@ -37,14 +37,18 @@ ALL_LIVE_REGISTRIES = {
     "🔥 Heat Transfer": (HEAT_TRANSFER_REGISTRY, "pages/3_🔥_Heat_Transfer.py"),
     "📊 Operations Analytics": (OPS_ANALYTICS_REGISTRY, "pages/4_📊_Operations_Analytics.py"),
 }
-LIVE_KEYS = set()
-for registry, _page in ALL_LIVE_REGISTRIES.values():
-    LIVE_KEYS.update(registry.keys())
-# fd_002ab in the roadmap represents both fd_002a and fd_002b (liquid + gas
-# variants delivered as one roadmap item) — treat it live if either exists.
-if "fd_002a" in LIVE_KEYS or "fd_002b" in LIVE_KEYS:
-    LIVE_KEYS.add("fd_002ab")
 
+@st.cache_data
+def _compute_live_keys():
+    live = set()
+    for registry, _page in ALL_LIVE_REGISTRIES.values():
+        live.update(registry.keys())
+    # fd_002ab in the roadmap represents both fd_002a and fd_002b — treat it live if either exists.
+    if "fd_002a" in live or "fd_002b" in live:
+        live.add("fd_002ab")
+    return frozenset(live)
+
+LIVE_KEYS = set(_compute_live_keys())
 TOTAL_LIVE = sum(1 for e in ROADMAP if e.key in LIVE_KEYS)
 TOTAL_ROADMAP = len(ROADMAP)
 
