@@ -5,6 +5,14 @@ Injects a clean, enterprise-grade CSS theme (slate grey / navy blue
 accents, HYSYS-like professional feel) into every Streamlit page. Call
 `inject_global_css()` once near the top of every page after
 `st.set_page_config(...)`.
+
+MOBILE UPDATE: added responsive breakpoints (@media max-width: 768px and
+480px) so the suite is usable on phones/tablets, not just desktop-wide
+layout. Streamlit's built-in column stacking on narrow screens was being
+undermined by fixed paddings, oversized brand header flex items, and a
+metric-card grid that never reflowed — all addressed below. No class
+names or function signatures changed, so this is a drop-in replacement
+for the existing file; nothing else needs to change.
 """
 
 import streamlit as st
@@ -39,6 +47,14 @@ def inject_global_css() -> None:
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }}
 
+        /* ---------- Main content padding (tighter on mobile by default) ---------- */
+        .block-container {{
+            padding-top: 2rem;
+            padding-left: 3rem;
+            padding-right: 3rem;
+            max-width: 100%;
+        }}
+
         /* ---------- Sidebar ---------- */
         section[data-testid="stSidebar"] {{
             background-color: {SLATE_DARK};
@@ -58,6 +74,7 @@ def inject_global_css() -> None:
             padding: 6px 0 14px 0;
             border-bottom: 1px solid #334155;
             margin-bottom: 14px;
+            flex-wrap: wrap;
         }}
         .brand-logo-badge {{
             width: 40px; height: 40px;
@@ -74,6 +91,8 @@ def inject_global_css() -> None:
             font-weight: 800;
             border-bottom: 3px solid {ACCENT_BLUE};
             padding-bottom: 0.4rem;
+            font-size: 1.9rem;
+            word-wrap: break-word;
         }}
         h2, h3 {{
             color: {PRIMARY_NAVY};
@@ -92,9 +111,12 @@ def inject_global_css() -> None:
         div[data-testid="stMetricLabel"] {{
             color: #64748b !important;
             font-weight: 600;
+            font-size: 0.8rem !important;
         }}
         div[data-testid="stMetricValue"] {{
             color: {PRIMARY_NAVY} !important;
+            font-size: 1.4rem !important;
+            word-break: break-word;
         }}
 
         /* ---------- Buttons ---------- */
@@ -105,16 +127,26 @@ def inject_global_css() -> None:
             border-radius: 6px;
             border: none;
             padding: 0.5rem 1.2rem;
+            width: 100%;
         }}
         .stButton > button:hover, .stDownloadButton > button:hover {{
             background-color: {PRIMARY_NAVY};
             color: white;
         }}
 
-        /* ---------- Tabs ---------- */
+        /* ---------- Tabs (horizontally scrollable instead of overflowing/wrapping badly) ---------- */
+        div[data-baseweb="tab-list"] {{
+            overflow-x: auto;
+            overflow-y: hidden;
+            flex-wrap: nowrap !important;
+            scrollbar-width: thin;
+            -webkit-overflow-scrolling: touch;
+        }}
         button[data-baseweb="tab"] {{
             font-weight: 600;
             color: #475569;
+            white-space: nowrap;
+            flex-shrink: 0;
         }}
         button[data-baseweb="tab"][aria-selected="true"] {{
             color: {ACCENT_BLUE};
@@ -139,7 +171,8 @@ def inject_global_css() -> None:
         /* ---------- Dataframes / tables ---------- */
         [data-testid="stTable"] {{
             border-radius: 8px;
-            overflow: hidden;
+            overflow-x: auto;
+            display: block;
         }}
 
         /* ---------- Status pill badges (Live / Coming Soon) ---------- */
@@ -151,33 +184,116 @@ def inject_global_css() -> None:
             background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 700;
             padding: 2px 8px; border-radius: 9999px; display: inline-block;
         }}
+
+        /* =====================================================================
+           MOBILE / TABLET RESPONSIVE OVERRIDES
+           ===================================================================== */
+
+        /* --- Tablet and below (portrait tablets, large phones landscape) --- */
+        @media (max-width: 768px) {{
+            .block-container {{
+                padding-top: 1rem;
+                padding-left: 1rem;
+                padding-right: 1rem;
+                padding-bottom: 2rem;
+            }}
+
+            h1 {{
+                font-size: 1.4rem;
+                padding-bottom: 0.3rem;
+                border-bottom-width: 2px;
+            }}
+            h2 {{ font-size: 1.15rem; }}
+            h3 {{ font-size: 1rem; }}
+
+            /* Force st.columns to stack vertically instead of squeezing side
+               by side — Streamlit's own responsive breakpoint is narrower
+               than this, so metric rows built with 3-4 columns were still
+               cramming on tablets. */
+            div[data-testid="stHorizontalBlock"] {{
+                flex-direction: column !important;
+            }}
+            div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
+                width: 100% !important;
+                flex: 1 1 100% !important;
+                min-width: 100% !important;
+                margin-bottom: 0.5rem;
+            }}
+
+            div[data-testid="stMetric"] {{
+                padding: 10px 12px;
+            }}
+            div[data-testid="stMetricValue"] {{
+                font-size: 1.2rem !important;
+            }}
+
+            .brand-header {{
+                gap: 8px;
+                padding: 4px 0 10px 0;
+            }}
+            .brand-logo-badge {{
+                width: 34px; height: 34px; font-size: 16px;
+            }}
+
+            .stButton > button, .stDownloadButton > button {{
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }}
+
+            /* Number/text inputs and selects: comfortable tap targets */
+            input, select, textarea {{
+                font-size: 16px !important; /* prevents iOS auto-zoom on focus */
+            }}
+
+            /* Sidebar: full-width when open, and don't let long tool titles
+               force horizontal scroll */
+            section[data-testid="stSidebar"] {{
+                min-width: 100% !important;
+                max-width: 100% !important;
+            }}
+            section[data-testid="stSidebar"] .block-container {{
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }}
+        }}
+
+        /* --- Phones (portrait) --- */
+        @media (max-width: 480px) {{
+            .block-container {{
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }}
+
+            h1 {{ font-size: 1.2rem; }}
+
+            .brand-header > div > div:first-child {{
+                font-size: 0.9rem !important;
+            }}
+            .brand-header > div > div:last-child {{
+                font-size: 0.68rem !important;
+            }}
+
+            div[data-testid="stMetric"] {{
+                padding: 8px 10px;
+            }}
+            div[data-testid="stMetricLabel"] {{
+                font-size: 0.72rem !important;
+            }}
+            div[data-testid="stMetricValue"] {{
+                font-size: 1.05rem !important;
+            }}
+
+            button[data-baseweb="tab"] {{
+                font-size: 0.8rem;
+                padding: 8px 10px;
+            }}
+
+            .status-live, .status-soon {{
+                font-size: 0.62rem;
+                padding: 1px 6px;
+            }}
+        }}
         </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
-def render_brand_header(compact: bool = False) -> None:
-    """
-    Sidebar (or main-page, if compact=False and called outside the
-    sidebar) branding block: logo badge + suite name. Replace the badge
-    text/gradient with an actual <img> tag once a real logo asset exists
-    — this is a clearly-marked placeholder per the branding requirement.
-    """
-    target = st.sidebar if compact else st
-    target.markdown(
-        f"""
-        <div class="brand-header">
-            <div class="brand-logo-badge">P</div>
-            <div>
-                <div style="font-weight:800;font-size:{'0.95rem' if compact else '1.4rem'};color:{'#e2e8f0' if compact else PRIMARY_NAVY};">
-                    Paras Chemical Engineering
-                </div>
-                <div style="font-size:0.75rem;color:{'#94a3b8' if compact else '#64748b'};">
-                    Calc Suite &middot; Enterprise Edition
-                </div>
-            </div>
-        </div>
         """,
         unsafe_allow_html=True,
     )
@@ -212,3 +328,29 @@ def render_engineering_basis(formula_md: str, references: list[str], assumptions
         st.markdown("**Assumptions & Limitations:**")
         for a in assumptions:
             st.markdown(f"- {a}")
+
+
+def render_brand_header(compact: bool = False) -> None:
+    """
+    Sidebar (or main-page, if compact=False and called outside the
+    sidebar) branding block: logo badge + suite name. Replace the badge
+    text/gradient with an actual <img> tag once a real logo asset exists
+    — this is a clearly-marked placeholder per the branding requirement.
+    """
+    target = st.sidebar if compact else st
+    target.markdown(
+        f"""
+        <div class="brand-header">
+            <div class="brand-logo-badge">P</div>
+            <div>
+                <div style="font-weight:800;font-size:{'0.95rem' if compact else '1.4rem'};color:{'#e2e8f0' if compact else PRIMARY_NAVY};">
+                    Paras Chemical Engineering
+                </div>
+                <div style="font-size:0.75rem;color:{'#94a3b8' if compact else '#64748b'};">
+                    Calc Suite &middot; Enterprise Edition
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
