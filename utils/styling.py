@@ -1,30 +1,42 @@
 """
 utils/styling.py
 ==================
-Injects a clean, enterprise-grade CSS theme (slate grey / navy blue
-accents, HYSYS-like professional feel) into every Streamlit page. Call
-`inject_global_css()` once near the top of every page after
+Injects the suite's visual theme, matched to the reference design at
+calculators.profitsfirst.in: deep teal sidebar, mint-green accents,
+white rounded cards with soft shadows, light gray page background.
+Call `inject_global_css()` once near the top of every page after
 `st.set_page_config(...)`.
 
-MOBILE UPDATE: added responsive breakpoints (@media max-width: 768px and
-480px) so the suite is usable on phones/tablets, not just desktop-wide
-layout. Streamlit's built-in column stacking on narrow screens was being
-undermined by fixed paddings, oversized brand header flex items, and a
-metric-card grid that never reflowed — all addressed below. No class
-names or function signatures changed, so this is a drop-in replacement
-for the existing file; nothing else needs to change.
+Includes mobile/tablet responsive breakpoints (max-width: 768px, 480px)
+so the suite works on phones, not just desktop-wide layout.
+
+No class names or function signatures changed from the previous version
+— this is a drop-in replacement for the existing file.
 """
 
 import streamlit as st
 
 
-PRIMARY_NAVY = "#1e3a5f"
-ACCENT_BLUE = "#2563eb"
-SLATE_BG = "#f1f5f9"
-SLATE_DARK = "#0f172a"
+# ---------------------------------------------------------------------
+# Palette — matched to the Profits First reference screenshots:
+# dark teal sidebar/headings, mint-green accent for icons/buttons/links,
+# white cards on a light gray page background.
+# ---------------------------------------------------------------------
+PRIMARY_TEAL = "#0A4B68"        # their "secondary" - dark teal, sidebar bg / headings
+PRIMARY_TEAL_DARK = "#083b52"   # darker teal - button hover, active states
+ACCENT_MINT = "#10C89C"         # their "primary" - mint/teal-green, buttons/links/active icons
+ACCENT_MINT_LIGHT = "#d1fae5"   # emerald-100 equivalent - icon badge backgrounds
+SLATE_BG = "#f8fafc"            # page background, light gray
+CARD_BG = "#ffffff"
+TEXT_BODY = "#64748b"           # secondary/body gray text
 SUCCESS_GREEN = "#16a34a"
 WARNING_AMBER = "#d97706"
 ERROR_RED = "#dc2626"
+
+# Kept for backward compatibility with any code still referencing the old names
+PRIMARY_NAVY = PRIMARY_TEAL
+ACCENT_BLUE = ACCENT_MINT
+SLATE_DARK = PRIMARY_TEAL
 
 
 def inject_global_css() -> None:
@@ -47,7 +59,7 @@ def inject_global_css() -> None:
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }}
 
-        /* ---------- Main content padding (tighter on mobile by default) ---------- */
+        /* ---------- Main content padding ---------- */
         .block-container {{
             padding-top: 2rem;
             padding-left: 3rem;
@@ -55,15 +67,19 @@ def inject_global_css() -> None:
             max-width: 100%;
         }}
 
-        /* ---------- Sidebar ---------- */
+        /* ---------- Sidebar: deep teal, matching reference nav drawer ---------- */
         section[data-testid="stSidebar"] {{
-            background-color: {SLATE_DARK};
+            background-color: {PRIMARY_TEAL};
         }}
         section[data-testid="stSidebar"] * {{
-            color: #e2e8f0 !important;
+            color: #e6f4f1 !important;
         }}
         section[data-testid="stSidebar"] input {{
-            color: #0f172a !important;
+            color: {PRIMARY_TEAL} !important;
+        }}
+        /* Sidebar radio/selectbox "pill" active state, mint accent */
+        section[data-testid="stSidebar"] label[data-baseweb="radio"] {{
+            border-radius: 8px;
         }}
 
         /* ---------- Brand header block ---------- */
@@ -72,69 +88,77 @@ def inject_global_css() -> None:
             align-items: center;
             gap: 12px;
             padding: 6px 0 14px 0;
-            border-bottom: 1px solid #334155;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
             margin-bottom: 14px;
             flex-wrap: wrap;
         }}
         .brand-logo-badge {{
             width: 40px; height: 40px;
-            background: linear-gradient(135deg, {ACCENT_BLUE}, {PRIMARY_NAVY});
+            background: #ffffff;
             border-radius: 8px;
             display: flex; align-items: center; justify-content: center;
-            font-size: 20px; font-weight: 800; color: white;
+            font-size: 20px; font-weight: 800; color: {PRIMARY_TEAL};
             flex-shrink: 0;
         }}
 
         /* ---------- Headers ---------- */
         h1 {{
-            color: {PRIMARY_NAVY};
+            color: {PRIMARY_TEAL};
             font-weight: 800;
-            border-bottom: 3px solid {ACCENT_BLUE};
-            padding-bottom: 0.4rem;
-            font-size: 1.9rem;
+            font-size: 2rem;
             word-wrap: break-word;
         }}
         h2, h3 {{
-            color: {PRIMARY_NAVY};
+            color: {PRIMARY_TEAL};
             font-weight: 700;
         }}
+        p, .stMarkdown p {{
+            color: {TEXT_BODY};
+        }}
 
-        /* ---------- Metric cards ---------- */
+        /* ---------- Cards (tool cards, metric cards) - white, rounded, soft shadow ---------- */
         div[data-testid="stMetric"] {{
-            background: #ffffff;
+            background: {CARD_BG};
             border: 1px solid #e2e8f0;
-            border-left: 4px solid {ACCENT_BLUE};
-            border-radius: 8px;
-            padding: 14px 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            border-radius: 16px;
+            padding: 16px 18px;
+            box-shadow: 0 4px 6px -1px rgba(10, 75, 104, 0.1), 0 2px 4px -2px rgba(10, 75, 104, 0.1);
         }}
         div[data-testid="stMetricLabel"] {{
-            color: #64748b !important;
+            color: {TEXT_BODY} !important;
             font-weight: 600;
             font-size: 0.8rem !important;
         }}
         div[data-testid="stMetricValue"] {{
-            color: {PRIMARY_NAVY} !important;
+            color: {PRIMARY_TEAL} !important;
             font-size: 1.4rem !important;
             word-break: break-word;
         }}
 
-        /* ---------- Buttons ---------- */
+        /* Generic bordered containers (st.container(border=True)) styled as
+           soft-shadow rounded cards to match the reference tool-list cards */
+        div[data-testid="stVerticalBlockBorderWrapper"] {{
+            border-radius: 16px !important;
+            border: 1px solid #edf2f4 !important;
+            box-shadow: 0 4px 6px -1px rgba(10, 75, 104, 0.1), 0 2px 4px -2px rgba(10, 75, 104, 0.1);
+        }}
+
+        /* ---------- Buttons: mint accent, matching reference CTAs ---------- */
         .stButton > button, .stDownloadButton > button {{
-            background-color: {ACCENT_BLUE};
+            background-color: {ACCENT_MINT};
             color: white;
             font-weight: 600;
-            border-radius: 6px;
+            border-radius: 8px;
             border: none;
-            padding: 0.5rem 1.2rem;
+            padding: 0.55rem 1.2rem;
             width: 100%;
         }}
         .stButton > button:hover, .stDownloadButton > button:hover {{
-            background-color: {PRIMARY_NAVY};
+            background-color: #0d9488;
             color: white;
         }}
 
-        /* ---------- Tabs (horizontally scrollable instead of overflowing/wrapping badly) ---------- */
+        /* ---------- Tabs (horizontally scrollable, mint active underline) ---------- */
         div[data-baseweb="tab-list"] {{
             overflow-x: auto;
             overflow-y: hidden;
@@ -144,40 +168,48 @@ def inject_global_css() -> None:
         }}
         button[data-baseweb="tab"] {{
             font-weight: 600;
-            color: #475569;
+            color: {TEXT_BODY};
             white-space: nowrap;
             flex-shrink: 0;
         }}
         button[data-baseweb="tab"][aria-selected="true"] {{
-            color: {ACCENT_BLUE};
+            color: {ACCENT_MINT};
+        }}
+        div[data-baseweb="tab-highlight"] {{
+            background-color: {ACCENT_MINT} !important;
         }}
 
         /* ---------- Expanders (Engineering Basis panels) ---------- */
         details {{
-            background: #f8fafc;
+            background: {CARD_BG};
             border: 1px solid #e2e8f0;
-            border-radius: 8px;
+            border-radius: 12px;
         }}
         summary {{
             font-weight: 600;
-            color: {PRIMARY_NAVY};
-        }}
-
-        /* ---------- Cards / containers ---------- */
-        div[data-testid="stVerticalBlockBorderWrapper"] {{
-            border-radius: 10px;
+            color: {PRIMARY_TEAL};
         }}
 
         /* ---------- Dataframes / tables ---------- */
         [data-testid="stTable"] {{
-            border-radius: 8px;
+            border-radius: 12px;
             overflow-x: auto;
             display: block;
         }}
 
+        /* ---------- Icon badge helper (mint, for use alongside tool titles) ---------- */
+        .icon-badge {{
+            background: {ACCENT_MINT_LIGHT};
+            color: {ACCENT_MINT};
+            width: 44px; height: 44px;
+            border-radius: 10px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }}
+
         /* ---------- Status pill badges (Live / Coming Soon) ---------- */
         .status-live {{
-            background: #dcfce7; color: #166534; font-size: 0.7rem; font-weight: 700;
+            background: {ACCENT_MINT_LIGHT}; color: #0d7d6f; font-size: 0.7rem; font-weight: 700;
             padding: 2px 8px; border-radius: 9999px; display: inline-block;
         }}
         .status-soon {{
@@ -189,7 +221,6 @@ def inject_global_css() -> None:
            MOBILE / TABLET RESPONSIVE OVERRIDES
            ===================================================================== */
 
-        /* --- Tablet and below (portrait tablets, large phones landscape) --- */
         @media (max-width: 768px) {{
             .block-container {{
                 padding-top: 1rem;
@@ -198,18 +229,12 @@ def inject_global_css() -> None:
                 padding-bottom: 2rem;
             }}
 
-            h1 {{
-                font-size: 1.4rem;
-                padding-bottom: 0.3rem;
-                border-bottom-width: 2px;
-            }}
+            h1 {{ font-size: 1.5rem; }}
             h2 {{ font-size: 1.15rem; }}
             h3 {{ font-size: 1rem; }}
 
-            /* Force st.columns to stack vertically instead of squeezing side
-               by side — Streamlit's own responsive breakpoint is narrower
-               than this, so metric rows built with 3-4 columns were still
-               cramming on tablets. */
+            /* Force st.columns to stack vertically instead of squeezing
+               side by side on tablets */
             div[data-testid="stHorizontalBlock"] {{
                 flex-direction: column !important;
             }}
@@ -221,7 +246,7 @@ def inject_global_css() -> None:
             }}
 
             div[data-testid="stMetric"] {{
-                padding: 10px 12px;
+                padding: 12px 14px;
             }}
             div[data-testid="stMetricValue"] {{
                 font-size: 1.2rem !important;
@@ -240,13 +265,10 @@ def inject_global_css() -> None:
                 font-size: 0.9rem;
             }}
 
-            /* Number/text inputs and selects: comfortable tap targets */
             input, select, textarea {{
                 font-size: 16px !important; /* prevents iOS auto-zoom on focus */
             }}
 
-            /* Sidebar: full-width when open, and don't let long tool titles
-               force horizontal scroll */
             section[data-testid="stSidebar"] {{
                 min-width: 100% !important;
                 max-width: 100% !important;
@@ -257,14 +279,13 @@ def inject_global_css() -> None:
             }}
         }}
 
-        /* --- Phones (portrait) --- */
         @media (max-width: 480px) {{
             .block-container {{
                 padding-left: 0.75rem;
                 padding-right: 0.75rem;
             }}
 
-            h1 {{ font-size: 1.2rem; }}
+            h1 {{ font-size: 1.25rem; }}
 
             .brand-header > div > div:first-child {{
                 font-size: 0.9rem !important;
@@ -274,7 +295,8 @@ def inject_global_css() -> None:
             }}
 
             div[data-testid="stMetric"] {{
-                padding: 8px 10px;
+                padding: 10px 12px;
+                border-radius: 12px;
             }}
             div[data-testid="stMetricLabel"] {{
                 font-size: 0.72rem !important;
@@ -305,7 +327,7 @@ def render_page_header(title: str, subtitle: str = "") -> None:
         f"""
         <div style="padding:4px 0 12px 0;">
             <h1 style="margin-bottom:2px;">{title}</h1>
-            <p style="color:#64748b;font-size:0.95rem;margin-top:0;">{subtitle}</p>
+            <p style="color:{TEXT_BODY};font-size:0.95rem;margin-top:0;">{subtitle}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -332,21 +354,23 @@ def render_engineering_basis(formula_md: str, references: list[str], assumptions
 
 def render_brand_header(compact: bool = False) -> None:
     """
-    Sidebar (or main-page, if compact=False and called outside the
-    sidebar) branding block: logo badge + suite name. Replace the badge
-    text/gradient with an actual <img> tag once a real logo asset exists
-    — this is a clearly-marked placeholder per the branding requirement.
+    Sidebar (or main-page, if compact=False) branding block: logo badge +
+    suite name, matched to the reference site's white-badge-on-teal
+    header treatment. Replace the badge text with an actual <img> tag
+    once a real logo asset exists.
     """
     target = st.sidebar if compact else st
+    title_color = "#e6f4f1" if compact else PRIMARY_TEAL
+    subtitle_color = "#a8d9d1" if compact else TEXT_BODY
     target.markdown(
         f"""
         <div class="brand-header">
             <div class="brand-logo-badge">P</div>
             <div>
-                <div style="font-weight:800;font-size:{'0.95rem' if compact else '1.4rem'};color:{'#e2e8f0' if compact else PRIMARY_NAVY};">
+                <div style="font-weight:800;font-size:{'0.95rem' if compact else '1.4rem'};color:{title_color};">
                     Paras Chemical Engineering
                 </div>
-                <div style="font-size:0.75rem;color:{'#94a3b8' if compact else '#64748b'};">
+                <div style="font-size:0.75rem;color:{subtitle_color};">
                     Calc Suite &middot; Enterprise Edition
                 </div>
             </div>
