@@ -11,7 +11,7 @@ from calculators.operations_analytics_engine import REGISTRY as OPS_ANALYTICS_RE
 from calculators.tool_roadmap import ROADMAP, get_domain_order
 
 # ---------------------------------------------------------------------
-# 1. PAGE CONFIGURATION
+# 1. PAGE CONFIGURATION & THEME STYLING
 # ---------------------------------------------------------------------
 st.set_page_config(
     layout="wide",
@@ -47,10 +47,10 @@ st.markdown("""
         background-color: #ffffff;
         border: 1px solid #cbd5e1;
         border-radius: 12px;
-        padding: 20px;
+        padding: 16px;
         box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.08);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
     }
 
     .dashboard-card:hover {
@@ -93,7 +93,30 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# 2. MERGE LIVE REGISTRIES & STATUS CHECK
+# 2. SESSION STATE CACHE INITIALIZATION (INPUT DATA CACHE)
+# ---------------------------------------------------------------------
+if "input_cache" not in st.session_state:
+    # Pre-populate with standard engineering defaults
+    st.session_state.input_cache = {
+        "flow_rate": 120.0,
+        "temperature": 25.0,
+        "pressure": 1.013,
+        "density": 998.2,
+        "viscosity": 1.002,
+        "pipe_diameter": 100.0,
+        "pipe_length": 50.0,
+    }
+
+def update_input_cache(key: str, value):
+    """Store input parameters dynamically in global session cache."""
+    st.session_state.input_cache[key] = value
+
+def get_cached_input(key: str, default_val):
+    """Retrieve pre-filled input data from session cache."""
+    return st.session_state.input_cache.get(key, default_val)
+
+# ---------------------------------------------------------------------
+# 3. MERGE LIVE REGISTRIES & STATUS CHECK
 # ---------------------------------------------------------------------
 ALL_LIVE_REGISTRIES = {
     "🌊 Fluid Dynamics & Hydraulics": (FLUID_DYNAMICS_REGISTRY, "pages/1_🌊_Fluid_Dynamics.py"),
@@ -102,19 +125,25 @@ ALL_LIVE_REGISTRIES = {
     "📊 Operations Analytics": (OPS_ANALYTICS_REGISTRY, "pages/4_📊_Operations_Analytics.py"),
 }
 
+# Build mapping from tool key -> page file path
+TOOL_PAGE_MAP = {}
 LIVE_KEYS = set()
-for registry, _page in ALL_LIVE_REGISTRIES.values():
-    LIVE_KEYS.update(registry.keys())
+
+for domain_name, (registry, page_path) in ALL_LIVE_REGISTRIES.items():
+    for k in registry.keys():
+        LIVE_KEYS.add(k)
+        TOOL_PAGE_MAP[k] = page_path
 
 # fd_002ab handles both liquid & gas variants
 if "fd_002a" in LIVE_KEYS or "fd_002b" in LIVE_KEYS:
     LIVE_KEYS.add("fd_002ab")
+    TOOL_PAGE_MAP["fd_002ab"] = "pages/1_🌊_Fluid_Dynamics.py"
 
 TOTAL_LIVE = sum(1 for e in ROADMAP if e.key in LIVE_KEYS)
 TOTAL_ROADMAP = len(ROADMAP)
 
 # ---------------------------------------------------------------------
-# 3. SIDEBAR — BRANDING, NAVIGATION, UNITS, SEARCH
+# 4. SIDEBAR — BRANDING, NAVIGATION, UNITS, SEARCH & CACHE SUMMARY
 # ---------------------------------------------------------------------
 with st.sidebar:
     render_brand_header(compact=True)
@@ -123,8 +152,8 @@ with st.sidebar:
 
     selected_view = option_menu(
         menu_title=None,
-        options=["Dashboard / Roadmap", "Global Search", "Domain Index"],
-        icons=["grid-fill", "search", "diagram-3"],
+        options=["Dashboard / Roadmap", "Global Search", "Domain Index", "Input Data Cache"],
+        icons=["grid-fill", "search", "diagram-3", "database-fill-gear"],
         default_index=0,
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
@@ -157,7 +186,7 @@ with st.sidebar:
         st.markdown(f"<span style='color: #94a3b8;'>⚡ <b>{TOTAL_LIVE} of {TOTAL_ROADMAP}</b> tools active.</span>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# 4. MAIN BODY ROUTING
+# 5. MAIN BODY ROUTING
 # ---------------------------------------------------------------------
 render_brand_header(compact=False)
 render_page_header(
@@ -180,7 +209,7 @@ st.markdown("---")
 
 # VIEW 1: DASHBOARD & ROADMAP TABS
 if selected_view == "Dashboard / Roadmap":
-    st.markdown("<h3 style='color: #0f172a;'>📋 Tool Roadmap</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0f172a;'>📋 Tool Roadmap & Direct Launcher</h3>", unsafe_allow_html=True)
     domain_tabs = st.tabs([d.split(" ", 1)[1] if " " in d else d for d in get_domain_order()])
 
     for tab, domain in zip(domain_tabs, get_domain_order()):
@@ -194,6 +223,7 @@ if selected_view == "Dashboard / Roadmap":
                     '<span class="card-badge-soon">COMING SOON</span>'
                 )
                 
+                # Card Container
                 st.markdown(
                     f"""
                     <div class="dashboard-card">
@@ -206,6 +236,15 @@ if selected_view == "Dashboard / Roadmap":
                     """,
                     unsafe_allow_html=True
                 )
+                
+                # Clickable Link to Tool Page
+                if is_live and e.key in TOOL_PAGE_MAP:
+                    btn_col1, _ = st.columns([1, 4])
+                    with btn_col1:
+                        if st.button(f"🚀 Open Tool #{e.number}", key=f"btn_dash_{e.key}", type="primary"):
+                            st.session_state["active_tool_key"] = e.key
+                            st.switch_page(TOOL_PAGE_MAP[e.key])
+                st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
 # VIEW 2: GLOBAL SEARCH
 elif selected_view == "Global Search":
@@ -226,11 +265,19 @@ elif selected_view == "Global Search":
                         <span class="card-title">#{e.number}. {e.title}</span>
                         {badge_html}
                     </div>
-                    <div class="card-key">Domain: {e.domain}</div>
+                    <div class="card-key">Domain: {e.domain} | Key: <code>{e.key}</code></div>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
+            
+            if is_live and e.key in TOOL_PAGE_MAP:
+                btn_col1, _ = st.columns([1, 4])
+                with btn_col1:
+                    if st.button(f"🚀 Launch #{e.number}", key=f"btn_search_{e.key}", type="primary"):
+                        st.session_state["active_tool_key"] = e.key
+                        st.switch_page(TOOL_PAGE_MAP[e.key])
+            st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
     else:
         st.info("Type a query in the sidebar search box to filter across all 51 roadmap tools.")
 
@@ -243,8 +290,55 @@ elif selected_view == "Domain Index":
         
         with st.expander(f"{domain} ({live_count}/{len(domain_tools)} Live)"):
             for e in domain_tools:
-                status_icon = "🟢" if e.key in LIVE_KEYS else "⚪"
-                st.write(f"{status_icon} **#{e.number}. {e.title}**")
+                is_live = e.key in LIVE_KEYS
+                status_icon = "🟢" if is_live else "⚪"
+                
+                col_info, col_btn = st.columns([4, 1])
+                with col_info:
+                    st.write(f"{status_icon} **#{e.number}. {e.title}** (`{e.key}`)")
+                with col_btn:
+                    if is_live and e.key in TOOL_PAGE_MAP:
+                        if st.button("Launch", key=f"btn_idx_{e.key}"):
+                            st.session_state["active_tool_key"] = e.key
+                            st.switch_page(TOOL_PAGE_MAP[e.key])
+
+# VIEW 4: INPUT DATA CACHE MANAGER
+elif selected_view == "Input Data Cache":
+    st.markdown("<h3 style='color: #0f172a;'>🗄️ Global Input Data Cache</h3>", unsafe_allow_html=True)
+    st.caption("Shared process inputs across tools. Modify standard values here to pre-populate calculation forms.")
+
+    cache_cols = st.columns(2)
+    with cache_cols[0]:
+        st.subheader("💧 Fluid & Flow Defaults")
+        st.session_state.input_cache["flow_rate"] = st.number_input(
+            "Volumetric Flow Rate (m³/h / gpm)",
+            value=float(st.session_state.input_cache.get("flow_rate", 120.0))
+        )
+        st.session_state.input_cache["temperature"] = st.number_input(
+            "Process Temperature (°C / °F)",
+            value=float(st.session_state.input_cache.get("temperature", 25.0))
+        )
+        st.session_state.input_cache["pressure"] = st.number_input(
+            "Operating Pressure (bar a / psia)",
+            value=float(st.session_state.input_cache.get("pressure", 1.013))
+        )
+
+    with cache_cols[1]:
+        st.subheader("📏 Geometry & Physical Properties")
+        st.session_state.input_cache["density"] = st.number_input(
+            "Fluid Density (kg/m³)",
+            value=float(st.session_state.input_cache.get("density", 998.2))
+        )
+        st.session_state.input_cache["viscosity"] = st.number_input(
+            "Dynamic Viscosity (cP)",
+            value=float(st.session_state.input_cache.get("viscosity", 1.002))
+        )
+        st.session_state.input_cache["pipe_diameter"] = st.number_input(
+            "Pipe Inner Diameter (mm)",
+            value=float(st.session_state.input_cache.get("pipe_diameter", 100.0))
+        )
+
+    st.success("✅ Cache updated automatically across active calculators.")
 
 st.markdown("---")
 
@@ -252,8 +346,7 @@ st.markdown("---")
 st.markdown("<h3 style='color: #0f172a;'>Getting Started</h3>", unsafe_allow_html=True)
 st.markdown(
     """
-    Use the **sidebar navigation** to explore roadmap modules or search tools by keyword.
-    To execute live tools, open the corresponding domain page via the Streamlit sidebar page browser.
+    Use the **sidebar navigation** or click the **🚀 Open Tool** buttons on live cards above to launch tools directly.
     Your **SI / Imperial** unit selection dynamically configures unit displays across all active tool modules.
     """
 )
