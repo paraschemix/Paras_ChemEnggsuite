@@ -22,12 +22,18 @@ st.set_page_config(
 
 inject_global_css()
 
-# Inject Custom Tailwind-Inspired Modern UI Overrides
+# Inject Custom Navy Blue & White Theme Overrides
 st.markdown("""
     <style>
-    /* Main Canvas Background */
+    /* White Main Canvas Background */
     .stApp {
-        background-color: #f8fafc;
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+
+    /* Force Core Text Elements to Deep Navy */
+    h1, h2, h3, h4, h5, h6, p, label, span, div {
+        color: #0f172a;
     }
 
     /* Dark Navy Sidebar Styling */
@@ -36,34 +42,48 @@ st.markdown("""
         border-right: 1px solid #1e293b;
     }
 
-    /* Custom Metric & Tool Cards */
+    /* Modern White Card UI with Navy Text */
     .dashboard-card {
         background-color: #ffffff;
-        border: 1px solid #e2e8f0;
+        border: 1px solid #cbd5e1;
         border-radius: 12px;
         padding: 20px;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.08);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         margin-bottom: 16px;
     }
 
     .dashboard-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 6px -1px rgba(15, 23, 42, 0.12), 0 2px 4px -1px rgba(15, 23, 42, 0.08);
     }
 
+    /* Card Text Specifics */
+    .card-title {
+        color: #0f172a !important;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+
+    .card-key {
+        color: #1e3a8a !important;
+        font-size: 0.85rem;
+        margin-top: 4px;
+    }
+
+    /* Custom Badges */
     .card-badge-live {
         background-color: #dcfce7;
-        color: #166534;
+        color: #166534 !important;
         font-size: 0.75rem;
-        font-weight: 600;
+        font-weight: 700;
         padding: 2px 8px;
         border-radius: 9999px;
     }
 
     .card-badge-soon {
         background-color: #f1f5f9;
-        color: #64748b;
+        color: #475569 !important;
         font-size: 0.75rem;
         font-weight: 600;
         padding: 2px 8px;
@@ -101,7 +121,6 @@ with st.sidebar:
     render_unit_toggle()
     st.divider()
 
-    # Streamlit Option Menu Integration
     selected_view = option_menu(
         menu_title=None,
         options=["Dashboard / Roadmap", "Global Search", "Domain Index"],
@@ -119,7 +138,7 @@ with st.sidebar:
                 "padding": "10px 14px"
             },
             "nav-link-selected": {
-                "background-color": "rgba(255, 255, 255, 0.1)",
+                "background-color": "rgba(255, 255, 255, 0.15)",
                 "color": "#ffffff",
                 "font-weight": "600",
             },
@@ -129,13 +148,13 @@ with st.sidebar:
     st.divider()
 
     if selected_view == "Global Search":
-        st.markdown("### 🔎 Search Roadmap")
+        st.markdown("<h3 style='color: #ffffff;'>🔎 Search Roadmap</h3>", unsafe_allow_html=True)
         search_query = st.text_input(
             "Search 51 tools...", placeholder="e.g. 'Cv', 'NPSH', 'TOC'...",
             label_visibility="collapsed"
         )
     else:
-        st.caption(f"⚡ **{TOTAL_LIVE} of {TOTAL_ROADMAP}** tools active.")
+        st.markdown(f"<span style='color: #94a3b8;'>⚡ <b>{TOTAL_LIVE} of {TOTAL_ROADMAP}</b> tools active.</span>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
 # 4. MAIN BODY ROUTING
@@ -161,7 +180,7 @@ st.markdown("---")
 
 # VIEW 1: DASHBOARD & ROADMAP TABS
 if selected_view == "Dashboard / Roadmap":
-    st.markdown("### 📋 Tool Roadmap")
+    st.markdown("<h3 style='color: #0f172a;'>📋 Tool Roadmap</h3>", unsafe_allow_html=True)
     domain_tabs = st.tabs([d.split(" ", 1)[1] if " " in d else d for d in get_domain_order()])
 
     for tab, domain in zip(domain_tabs, get_domain_order()):
@@ -179,10 +198,10 @@ if selected_view == "Dashboard / Roadmap":
                     f"""
                     <div class="dashboard-card">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <strong style="color: #0f172a; font-size: 1rem;">#{e.number}. {e.title}</strong>
+                            <span class="card-title">#{e.number}. {e.title}</span>
                             {badge_html}
                         </div>
-                        <div style="color: #64748b; font-size: 0.85rem; margin-top: 4px;">Key: <code>{e.key}</code></div>
+                        <div class="card-key">Key: <code>{e.key}</code></div>
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -190,7 +209,7 @@ if selected_view == "Dashboard / Roadmap":
 
 # VIEW 2: GLOBAL SEARCH
 elif selected_view == "Global Search":
-    st.markdown("### 🔎 Global Tool Search Results")
+    st.markdown("<h3 style='color: #0f172a;'>🔎 Global Tool Search Results</h3>", unsafe_allow_html=True)
     if 'search_query' in locals() and search_query:
         q = search_query.lower()
         matches = [e for e in ROADMAP if q in e.title.lower() or q in e.domain.lower() or q in e.key.lower()]
@@ -204,10 +223,10 @@ elif selected_view == "Global Search":
                 f"""
                 <div class="dashboard-card">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <strong style="color: #0f172a;">#{e.number}. {e.title}</strong>
+                        <span class="card-title">#{e.number}. {e.title}</span>
                         {badge_html}
                     </div>
-                    <div style="color: #64748b; font-size: 0.85rem; margin-top: 4px;">Domain: {e.domain}</div>
+                    <div class="card-key">Domain: {e.domain}</div>
                 </div>
                 """,
                 unsafe_allow_html=True
@@ -217,7 +236,7 @@ elif selected_view == "Global Search":
 
 # VIEW 3: DOMAIN SUMMARY INDEX
 elif selected_view == "Domain Index":
-    st.markdown("### 📂 Domain Summary")
+    st.markdown("<h3 style='color: #0f172a;'>📂 Domain Summary</h3>", unsafe_allow_html=True)
     for domain in get_domain_order():
         domain_tools = [e for e in ROADMAP if e.domain == domain]
         live_count = sum(1 for e in domain_tools if e.key in LIVE_KEYS)
@@ -230,7 +249,7 @@ elif selected_view == "Domain Index":
 st.markdown("---")
 
 # Getting Started & Architecture
-st.markdown("### Getting Started")
+st.markdown("<h3 style='color: #0f172a;'>Getting Started</h3>", unsafe_allow_html=True)
 st.markdown(
     """
     Use the **sidebar navigation** to explore roadmap modules or search tools by keyword.
