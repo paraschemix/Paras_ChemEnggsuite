@@ -4,4 +4,3 @@ scipy>=1.13
 pandas>=2.2
 plotly>=5.22
 fpdf2>=2.7
-streamlit-option-menu

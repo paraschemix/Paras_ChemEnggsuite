@@ -1,0 +1,115 @@
+name: CI - Syntax & Smoke Test
+
+# Same standard as every prior release: syntax check, then Streamlit's
+# AppTest actually booting every page and clicking Calculate on the
+# live tools. This is what catches runtime bugs syntax checking can't
+# (e.g. a Python closure late-binding bug found during development of
+# an earlier version of this suite - only AppTest caught it).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Syntax check all Python files
+        run: |
+          python -c "
+          import ast, glob, sys
+          ok = True
+          files = ['app.py'] + glob.glob('pages/*.py') + \
+                   glob.glob('domains/**/*.py', recursive=True) + \
+                   glob.glob('utils/*.py')
+          for f in files:
+              try:
+                  ast.parse(open(f, encoding='utf-8').read())
+              except SyntaxError as e:
+                  print(f'FAIL {f}: {e}')
+                  ok = False
+          if not ok:
+              sys.exit(1)
+          print(f'{len(files)} files parse OK')
+          "
+
+      - name: Smoke test - landing page + all 12 domain pages boot
+        run: |
+          python -c "
+          import glob, sys
+          from streamlit.testing.v1 import AppTest
+
+          failed = False
+          for page in ['app.py'] + sorted(glob.glob('pages/*.py')):
+              at = AppTest.from_file(page)
+              at.run(timeout=30)
+              if at.exception:
+                  print(f'FAIL {page}: {at.exception[0]}')
+                  failed = True
+              else:
+                  print(f'OK   {page}')
+          if failed:
+              sys.exit(1)
+          "
+
+      - name: Smoke test - live calculators actually compute correctly
+        run: |
+          python -c "
+          from streamlit.testing.v1 import AppTest
+
+          # Hydraulics: default tab/tool is Pressure Drop
+          at = AppTest.from_file('pages/01_Hydraulics.py')
+          at.run(timeout=30)
+          at.button[0].click().run(timeout=30)
+          assert not at.exception, f'Hydraulics calc failed: {at.exception}'
+          assert len(at.metric) > 0, 'No results rendered'
+          print('Hydraulics (Pressure Drop) OK:', [(m.label, m.value) for m in at.metric])
+
+          # Hydraulics: explicitly verify Orifice Plate (newest tool)
+          at2 = AppTest.from_file('pages/01_Hydraulics.py')
+          at2.run(timeout=30)
+          for sb in at2.selectbox:
+              if 'select_Piping Systems' in sb.key:
+                  sb.set_value('hy_007').run(timeout=30)
+          for b in at2.button:
+              if b.key == 'hy_007_calc_btn':
+                  b.click().run(timeout=30)
+          assert not at2.exception, f'Orifice Plate calc failed: {at2.exception}'
+          metrics = {m.label: m.value for m in at2.metric}
+          assert 'Beta Ratio' in metrics, 'Orifice Plate did not render expected result'
+          print('Hydraulics (Orifice Plate) OK:', metrics)
+
+          # Mass Transfer: FUG distillation
+          at3 = AppTest.from_file('pages/04_Mass_Transfer.py')
+          at3.run(timeout=30)
+          at3.button[0].click().run(timeout=30)
+          assert not at3.exception, f'Mass Transfer calc failed: {at3.exception}'
+          assert len(at3.metric) > 0, 'No results rendered'
+          print('Mass Transfer (FUG) OK:', [(m.label, m.value) for m in at3.metric])
+          "
+
+      - name: Verify master roadmap integrity
+        run: |
+          python -c "
+          from utils.tool_roadmap import ROADMAP
+
+          keys = [e.key for e in ROADMAP]
+          dupes = set(k for k in keys if keys.count(k) > 1)
+          assert not dupes, f'Duplicate roadmap keys found: {dupes}'
+          assert len(ROADMAP) > 0, 'Roadmap is empty'
+          print(f'{len(ROADMAP)} roadmap entries, 0 duplicate keys - OK')
+          "
