@@ -435,6 +435,128 @@ TOOL_ORIFICE_PLATE = ToolSpec(
 )
 
 
+# =======================================================================
+# TOOL: PUMP BRAKE HORSEPOWER
+# =======================================================================
+
+def compute_pump_bhp(values: dict) -> dict:
+    flow_gpm = values["flow_gpm"]
+    head_ft = values["head_ft"]
+    sg = values["sg"]
+    efficiency_fraction = values["efficiency_fraction"]
+
+    has_error, has_warning, errors, warnings = run_validators(
+        check_positive(flow_gpm, "Flow"), check_positive(head_ft, "Head"), check_specific_gravity(sg),
+    )
+    if has_error:
+        raise ValueError("; ".join(errors))
+    if not (0 < efficiency_fraction <= 1):
+        raise ValueError("Efficiency must be between 0 (exclusive) and 1 (inclusive) - enter as a fraction, not a percentage.")
+
+    hydraulic_hp = (flow_gpm * head_ft * sg) / 3960
+    bhp = hydraulic_hp / efficiency_fraction
+
+    return {
+        "Hydraulic HP": round(hydraulic_hp, 3),
+        "Brake Horsepower (BHP)": round(bhp, 3),
+        "_warnings": warnings,
+    }
+
+
+TOOL_PUMP_BHP = ToolSpec(
+    key="hy_004",
+    title="Pump Total Dynamic Head & Brake Horsepower",
+    category="Pumps & Fluid Drivers",
+    description="Hydraulic and brake horsepower for a centrifugal pump given flow, head, and efficiency.",
+    inputs=[
+        InputSpec("flow_gpm", "Flow Rate", default=500.0, min_value=0.01, unit="(USGPM)"),
+        InputSpec("head_ft", "Total Dynamic Head", default=150.0, min_value=0.01, unit="(ft)"),
+        InputSpec("sg", "Specific Gravity", default=1.0, min_value=0.01, step=0.01),
+        InputSpec("efficiency_fraction", "Pump Efficiency", default=0.75, min_value=0.01, max_value=1.0, step=0.01,
+                   help="Enter as a fraction (e.g. 0.75), not a percentage."),
+    ],
+    compute=compute_pump_bhp,
+    formula_md=r"$$BHP = \dfrac{Q[\text{gpm}]\cdot H[\text{ft}]\cdot SG}{3960\cdot\eta}$$",
+    references=["Hydraulic Institute Standards (ANSI/HI 1.3)", "Perry's Chemical Engineers' Handbook, Section 10"],
+    assumptions=["Screening-level - actual pump selection requires vendor performance curves at the specific operating point."],
+)
+
+
+# =======================================================================
+# TOOL: COMPRESSOR POLYTROPIC HEAD & DISCHARGE TEMPERATURE
+# =======================================================================
+
+def compute_compressor_polytropic(values: dict) -> dict:
+    p1_psia = values["p1_psia"]
+    p2_psia = values["p2_psia"]
+    t1_r = values["t1_r"]
+    n_polytropic = values["n_polytropic"]
+    z_avg = values["z_avg"]
+    mw = values["mw"]
+    efficiency_fraction = values.get("efficiency_fraction")
+
+    has_error, has_warning, errors, warnings = run_validators(
+        check_positive(p1_psia, "Suction pressure"), check_positive(t1_r, "Suction temperature"),
+        check_positive(mw, "Molecular weight"),
+    )
+    if has_error:
+        raise ValueError("; ".join(errors))
+    if p2_psia <= p1_psia:
+        raise ValueError("Discharge pressure must exceed suction pressure.")
+    if n_polytropic <= 1:
+        raise ValueError("Polytropic exponent n must be greater than 1.")
+
+    ratio = p2_psia / p1_psia
+    t2_r = t1_r * ratio ** ((n_polytropic - 1) / n_polytropic)
+
+    r_universal = 1545.35  # ft-lbf/(lbmol-degR)
+    hp_ft = (n_polytropic / (n_polytropic - 1)) * (z_avg * r_universal * t1_r / mw) * (ratio ** ((n_polytropic - 1) / n_polytropic) - 1)
+
+    result = {
+        "Pressure Ratio": round(ratio, 4),
+        "Discharge Temperature (degR)": round(t2_r, 2),
+        "Discharge Temperature (degF)": round(t2_r - 459.67, 2),
+        "Polytropic Head (ft-lbf/lbm)": round(hp_ft, 1),
+    }
+
+    if efficiency_fraction:
+        if not (0 < efficiency_fraction <= 1):
+            raise ValueError("Efficiency must be between 0 (exclusive) and 1 (inclusive).")
+        gas_hp_per_lb_min = hp_ft / (33000 * efficiency_fraction)
+        result["Gas HP per lb/min"] = round(gas_hp_per_lb_min, 5)
+
+    result["_warnings"] = warnings
+    return result
+
+
+TOOL_COMPRESSOR = ToolSpec(
+    key="hy_005",
+    title="Compressor Polytropic Head & Power",
+    category="Compressors & Blowers",
+    description="Polytropic head, discharge temperature, and gas horsepower for a centrifugal compressor stage.",
+    inputs=[
+        InputSpec("p1_psia", "Suction Pressure (P1)", default=150.0, min_value=0.01, unit="(psia)"),
+        InputSpec("p2_psia", "Discharge Pressure (P2)", default=450.0, min_value=0.01, unit="(psia)"),
+        InputSpec("t1_r", "Suction Temperature (T1)", default=560.0, min_value=1.0, unit="(degR)"),
+        InputSpec("n_polytropic", "Polytropic Exponent (n)", default=1.35, min_value=1.01, max_value=2.0, step=0.01),
+        InputSpec("z_avg", "Average Compressibility (Z)", default=0.95, min_value=0.1, max_value=2.0, step=0.01),
+        InputSpec("mw", "Molecular Weight", default=18.0, min_value=1.0),
+        InputSpec("efficiency_fraction", "Polytropic Efficiency (optional)", default=0.78, min_value=0.0, max_value=1.0, step=0.01,
+                   help="Leave at 0 to skip gas horsepower calculation."),
+    ],
+    compute=compute_compressor_polytropic,
+    formula_md=(
+        r"$$T_2 = T_1(P_2/P_1)^{(n-1)/n}$$"
+        r"$$H_p = \dfrac{n}{n-1}\cdot\dfrac{ZRT_1}{MW}\left[(P_2/P_1)^{(n-1)/n}-1\right], \quad R=1545.35\ \text{ft-lbf/(lbmol-}^\circ\text{R)}$$"
+    ),
+    references=["GPSA Engineering Data Book, Section 13 - Compressors", "API 617"],
+    assumptions=[
+        "Screening-level - actual compressor selection requires vendor performance curves and a full multi-stage thermodynamic analysis.",
+        "Gas horsepower result is per lb/min of mass flow - multiply by actual mass flow rate for total gas horsepower.",
+    ],
+)
+
+
 REGISTRY: dict[str, ToolSpec] = {
     TOOL_PRESSURE_DROP.key: TOOL_PRESSURE_DROP,
     TOOL_VALVE_LIQUID.key: TOOL_VALVE_LIQUID,
@@ -442,4 +564,6 @@ REGISTRY: dict[str, ToolSpec] = {
     TOOL_NPSH.key: TOOL_NPSH,
     TOOL_WATER_HAMMER.key: TOOL_WATER_HAMMER,
     TOOL_ORIFICE_PLATE.key: TOOL_ORIFICE_PLATE,
+    TOOL_PUMP_BHP.key: TOOL_PUMP_BHP,
+    TOOL_COMPRESSOR.key: TOOL_COMPRESSOR,
 }
