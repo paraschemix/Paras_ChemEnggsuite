@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("🪨 Solids Handling", "Particle sizing, fluidization/conveying, solid-liquid separation, and bulk storage.")
-render_domain_page("Solids Handling", "Particle Technology & Bulk Solid Handling", REGISTRY, "🪨")
+render_domain_page("Solids Handling", "Particle Technology & Bulk Solid Handling", REGISTRY, "🪨", page_path="pages/08_Solids_Handling.py")

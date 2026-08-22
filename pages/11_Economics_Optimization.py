@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("💰 Economics & Optimization", "CAPEX/OPEX estimation, profitability metrics, and optimization.")
-render_domain_page("Economics & Optimization", "Process Economics, Costing & Optimization", REGISTRY, "💰")
+render_domain_page("Economics & Optimization", "Process Economics, Costing & Optimization", REGISTRY, "💰", page_path="pages/11_Economics_Optimization.py")

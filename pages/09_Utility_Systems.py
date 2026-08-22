@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("💧 Utility Systems", "Steam/condensate networks, cooling water, compressed air, and pinch analysis.")
-render_domain_page("Utility Systems", "Plant Utilities, Energy & Power Generation", REGISTRY, "💧")
+render_domain_page("Utility Systems", "Plant Utilities, Energy & Power Generation", REGISTRY, "💧", page_path="pages/09_Utility_Systems.py")

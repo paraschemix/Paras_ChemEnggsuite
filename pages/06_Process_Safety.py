@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("🛡️ Process Safety", "PSV sizing (API 520/521/2000), flare systems, dispersion modeling, and risk analysis. Phase 2 priority.")
-render_domain_page("Process Safety", "Process Safety, Relief & Loss Prevention", REGISTRY, "🛡️")
+render_domain_page("Process Safety", "Process Safety, Relief & Loss Prevention", REGISTRY, "🛡️", page_path="pages/06_Process_Safety.py")

@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("⚛️ Thermodynamics", "Equations of state, activity coefficients, phase equilibria, and physical property estimation.")
-render_domain_page("Thermodynamics", "Thermodynamics, VLE & Transport Properties", REGISTRY, "⚛️")
+render_domain_page("Thermodynamics", "Thermodynamics, VLE & Transport Properties", REGISTRY, "⚛️", page_path="pages/02_Thermodynamics.py")

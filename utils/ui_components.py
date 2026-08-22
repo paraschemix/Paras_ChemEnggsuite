@@ -35,20 +35,25 @@ from fpdf import FPDF
 
 
 # =======================================================================
-# 1. THEME / CSS — colors extracted directly from calculators.profitsfirst.in's
-#    own CSS (--color-secondary / --color-primary), not eyeballed.
+# 1. THEME / CSS — blue accent on a white background, per explicit
+#    request. Previously teal/mint (matched to a reference site); this
+#    supersedes that with a simpler, higher-contrast blue-on-white theme
+#    used consistently across every page via the shared inject_global_css().
 # =======================================================================
 
-PRIMARY_TEAL = "#0A4B68"
-PRIMARY_TEAL_DARK = "#083b52"
-ACCENT_MINT = "#10C89C"
-ACCENT_MINT_LIGHT = "#d1fae5"
-SLATE_BG = "#f8fafc"
+PRIMARY_TEAL = "#1D4ED8"        # blue-700 - headings, sidebar bg
+PRIMARY_TEAL_DARK = "#1E3A8A"   # blue-900 - button hover, active states
+ACCENT_MINT = "#2563EB"         # blue-600 - buttons, links, active tabs
+ACCENT_MINT_LIGHT = "#DBEAFE"   # blue-100 - icon/status badge backgrounds
+SLATE_BG = "#FFFFFF"            # white page background, as requested
 CARD_BG = "#ffffff"
-TEXT_BODY = "#64748b"
+TEXT_BODY = "#334155"           # slate-700 - body text, readable on white
 SUCCESS_GREEN = "#16a34a"
 WARNING_AMBER = "#d97706"
 ERROR_RED = "#dc2626"
+CAUTION_BG = "#FFFBEB"          # amber-50 - caution banner background
+CAUTION_BORDER = "#F59E0B"      # amber-500 - caution banner border
+CAUTION_TEXT = "#92400E"        # amber-800 - caution banner text
 
 
 def inject_global_css() -> None:
@@ -93,14 +98,14 @@ def inject_global_css() -> None:
         div[data-testid="stMetric"] {{
             background: {CARD_BG}; border: 1px solid #e2e8f0; border-radius: 16px;
             padding: 16px 18px;
-            box-shadow: 0 4px 6px -1px rgba(10, 75, 104, 0.1), 0 2px 4px -2px rgba(10, 75, 104, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(29, 78, 216, 0.1), 0 2px 4px -2px rgba(29, 78, 216, 0.1);
         }}
         div[data-testid="stMetricLabel"] {{ color: {TEXT_BODY} !important; font-weight: 600; font-size: 0.8rem !important; }}
         div[data-testid="stMetricValue"] {{ color: {PRIMARY_TEAL} !important; font-size: 1.4rem !important; word-break: break-word; }}
 
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             border-radius: 16px !important; border: 1px solid #edf2f4 !important;
-            box-shadow: 0 4px 6px -1px rgba(10, 75, 104, 0.1), 0 2px 4px -2px rgba(10, 75, 104, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(29, 78, 216, 0.1), 0 2px 4px -2px rgba(29, 78, 216, 0.1);
         }}
 
         .stButton > button, .stDownloadButton > button {{
@@ -123,12 +128,24 @@ def inject_global_css() -> None:
         [data-testid="stTable"] {{ border-radius: 12px; overflow-x: auto; display: block; }}
 
         .status-live {{
-            background: {ACCENT_MINT_LIGHT}; color: #0d7d6f; font-size: 0.7rem; font-weight: 700;
+            background: {ACCENT_MINT_LIGHT}; color: #1E3A8A; font-size: 0.7rem; font-weight: 700;
             padding: 2px 8px; border-radius: 9999px; display: inline-block;
         }}
         .status-soon {{
             background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 700;
             padding: 2px 8px; border-radius: 9999px; display: inline-block;
+        }}
+
+        /* ---------- Caution banner (validation-required notice) ---------- */
+        .caution-banner {{
+            background: {CAUTION_BG}; border: 1px solid {CAUTION_BORDER}; border-left: 4px solid {CAUTION_BORDER};
+            border-radius: 8px; padding: 10px 14px; margin: 10px 0; color: {CAUTION_TEXT};
+            font-size: 0.85rem; font-weight: 500;
+        }}
+
+        /* ---------- Cross-page navigation footer ---------- */
+        .page-nav-footer {{
+            margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;
         }}
 
         @media (max-width: 768px) {{
@@ -199,6 +216,44 @@ def render_page_header(title: str, subtitle: str = "") -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_caution_banner(custom_message: str = "") -> None:
+    """
+    Prominent validation-required notice, rendered for every tool via
+    utils/runner.py so it appears consistently across all 12 domains
+    without each page needing to remember to add it.
+    """
+    message = custom_message or (
+        "⚠️ <strong>Screening-level engineering tool — validate before use.</strong> "
+        "Results are for early-stage estimation only. Verify against certified engineering "
+        "packages, applicable codes/standards, and vendor data before using in safety, "
+        "regulatory, or capital-commitment decisions."
+    )
+    st.markdown(f'<div class="caution-banner">{message}</div>', unsafe_allow_html=True)
+
+
+def render_domain_footer_nav(current_page_path: str = "") -> None:
+    """
+    Cross-page navigation footer: links to Home plus every other domain
+    page, so no domain is a dead end. Rendered once per page via
+    utils/runner.py's render_domain_page() — every page gets this
+    automatically, no per-page edits needed beyond passing the page's
+    own path so it can exclude itself from the list.
+    """
+    from utils.tool_roadmap import DOMAIN_PAGES  # local import avoids a circular import at module load time
+
+    st.markdown('<div class="page-nav-footer">', unsafe_allow_html=True)
+    st.markdown("##### 🔗 Explore other domains")
+
+    other_pages = [(label, path) for label, path in DOMAIN_PAGES if path != current_page_path]
+    nav_cols = st.columns(4)
+    for i, (label, path) in enumerate(other_pages):
+        with nav_cols[i % 4]:
+            st.page_link(path, label=label, use_container_width=True)
+
+    st.page_link("app.py", label="🏠 Home", use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # =======================================================================
@@ -344,7 +399,7 @@ def generate_pdf_bytes(calc_title: str, input_params: dict, results_dict: dict, 
     pdf = FPDF()
     pdf.add_page()
 
-    pdf.set_fill_color(10, 75, 104)  # PRIMARY_TEAL as RGB
+    pdf.set_fill_color(29, 78, 216)  # PRIMARY_TEAL (blue-700) as RGB
     pdf.rect(0, 0, 210, 26, style="F")
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 16)
@@ -380,7 +435,7 @@ def generate_pdf_bytes(calc_title: str, input_params: dict, results_dict: dict, 
         pdf.ln(4)
 
     _section("Input Parameters", input_params, value_color=(15, 23, 42))
-    _section("Results", results_dict, value_color=(10, 75, 104))
+    _section("Results", results_dict, value_color=(29, 78, 216))
 
     warnings = results_dict.get("_warnings") or []
     if warnings:
@@ -434,13 +489,13 @@ def _build_html_report(calc_title: str, input_params: dict, results_dict: dict) 
     )
     result_rows = "".join(
         f"<tr><td style='padding:6px 12px;color:#475569;'>{str(k).replace('_',' ').title()}</td>"
-        f"<td style='padding:6px 12px;font-weight:700;color:#0A4B68;'>{v}</td></tr>"
+        f"<td style='padding:6px 12px;font-weight:700;color:#1D4ED8;'>{v}</td></tr>"
         for k, v in results_dict.items() if v is not None and k != "_warnings"
     )
     return f"""
     <html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f1f5f9;padding:24px;">
       <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">
-        <div style="background:#0A4B68;color:#fff;padding:20px 24px;">
+        <div style="background:#1D4ED8;color:#fff;padding:20px 24px;">
           <h2 style="margin:0;font-size:18px;">Paras Chemical Engineering Calc Suite</h2>
           <p style="margin:4px 0 0;color:#cbd5e1;font-size:13px;">{calc_title} - {timestamp}</p>
         </div>

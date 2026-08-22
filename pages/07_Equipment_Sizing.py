@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("⚙️ Equipment Sizing", "General equipment sizing tools. Content scope not yet confirmed against source taxonomy — see README.")
-render_domain_page("Equipment Sizing", "Equipment Sizing", REGISTRY, "⚙️")
+render_domain_page("Equipment Sizing", "Equipment Sizing", REGISTRY, "⚙️", page_path="pages/07_Equipment_Sizing.py")

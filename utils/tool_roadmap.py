@@ -114,7 +114,7 @@ _DOMAIN_1_BULLETS = [
 ]
 _DOMAIN_2_BULLETS = [
     "Peng-Robinson EOS PT/PV flash solver, Soave-Redlich-Kwong (SRK) EOS calculator, Benedict-Webb-Rubin-Starling (BWRS) gas property estimator, PC-SAFT polymer phase equilibrium engine, compressibility factor (Z) calculator (Standing-Katz / Hall-Yarborough)",
-    "NRTL binary parameter estimator, UNIQUAC activity coefficient solver, UNIFAC group-contribution property predictor, Wilson equation VLE fitting tool, van Laar & Margules activity model solvers",
+    "NRTL binary parameter estimator, UNIQUAC activity coefficient solver, UNIFAC group-contribution property predictor, Wilson equation VLE fitting tool, van Laar & Margules activity model solvers, Vapor pressure and dew point estimator (Antoine equation)",
     "Isothermal PT flash calculator, Adiabatic HP flash (Joule-Thomson expansion), Bubble point pressure & temperature solver, Dew point pressure & temperature solver, Liquid-Liquid Equilibrium (LLE) tie-line generator, Solid-Liquid Equilibrium (SLE) solubility curve solver, supercritical fluid density & solubility calculator",
     "Temperature-dependent liquid density (Costald), gas viscosity estimation (Chapman-Enskog), liquid mixture viscosity (Lobe / Grunberg-Nissan), thermal conductivity predictor (liquids & gases), surface tension mixture estimator, gas diffusivity in liquids (Wilke-Chang equation)",
     "ASME steam tables (IAPWS-IF97), psychrometric chart & air property calculator, flue gas dew point & acid gas condensation solver",
@@ -136,10 +136,10 @@ _DOMAIN_4_BULLETS = [
     "Reverse Osmosis (RO) flux & salt rejection calculator, gas separation membrane permeate purity predictor, ultrafiltration/microfiltration cake resistance estimator",
 ]
 _DOMAIN_5_BULLETS = [
-    "Continuous Stirred Tank Reactor (CSTR) volume solver, Plug Flow Reactor (PFR) volume & conversion calculator, batch reactor cycle time & conversion solver, CSTRs-in-series cascade simulator",
+    "Continuous Stirred Tank Reactor (CSTR) volume solver, Plug Flow Reactor (PFR) volume & conversion calculator, batch reactor cycle time & conversion solver, CSTRs-in-series cascade simulator, Space Velocity Calculator (WHSV), Conversion Selectivity and Yield calculator",
     "Arrhenius equation parameter solver (Ea, A), differential & integral method kinetic order fitting, Langmuir-Hinshelwood rate expression calculator, power-law kinetic fitting tool",
     "Thiele modulus & internal effectiveness factor (eta), Mears criterion for external mass transfer resistance, Weisz-Prater criterion for internal diffusion resistance, packed bed catalytic reactor pressure drop (Ergun), catalyst deactivation kinetics solver (coking/poisoning)",
-    "Reactor heat generation vs. removal curve overlay, adiabatic temperature rise (dTad) solver, runaway reaction threshold analysis, Semenov / Frank-Kamenetskii thermal explosion limit tool",
+    "Reactor heat generation vs. removal curve overlay, Adiabatic Temperature Rise calculator, runaway reaction threshold analysis, Semenov / Frank-Kamenetskii thermal explosion limit tool",
     "Monod cell growth kinetics calculator, oxygen transfer rate (OTR) & volumetric mass transfer coefficient (kLa) solver, bioreactor agitation power input calculator",
 ]
 _DOMAIN_6_BULLETS = [
@@ -204,7 +204,16 @@ _LIVE_TOOL_KEY_MAP = {
     "Net Positive Suction Head (NPSHa/NPSHr) margin estimator": "hy_003",
     "Water hammer / surge pressure wave analyzer": "hy_006",
     "orifice plate differential pressure calculator (ISO 5167)": "hy_007",
+    "Pump total dynamic head (TDH) & power rating": "hy_004",
+    "Centrifugal compressor head & power (Polytropic vs. Isentropic)": "hy_005",
     "Fenske-Underwood-Gilliland (FUG) shortcut distillation design": "mt_011",
+    "compressibility factor (Z) calculator (Standing-Katz / Hall-Yarborough)": "tp_001",
+    "Vapor pressure and dew point estimator (Antoine equation)": "tp_002",
+    "API 520 vapor/gas PSV orifice sizing": "ps_001",
+    "thermal expansion liquid relief valve sizing": "ps_002",
+    "Space Velocity Calculator (WHSV)": "kr_001",
+    "Conversion Selectivity and Yield calculator": "kr_002",
+    "Adiabatic Temperature Rise calculator": "kr_003",
 }
 
 
@@ -227,6 +236,25 @@ def _build_roadmap() -> list[RoadmapEntry]:
 
 
 ROADMAP: list[RoadmapEntry] = _build_roadmap()
+
+
+# Domain page directory - single source of truth for icon/label/page-path,
+# shared by app.py (domain cards) and utils/ui_components.py (footer
+# cross-navigation), so both stay in sync automatically.
+DOMAIN_PAGES: list[tuple[str, str]] = [
+    ("🔧 Hydraulics", "pages/01_Hydraulics.py"),
+    ("⚛️ Thermodynamics", "pages/02_Thermodynamics.py"),
+    ("🔥 Heat Transfer", "pages/03_Heat_Transfer.py"),
+    ("⚗️ Mass Transfer", "pages/04_Mass_Transfer.py"),
+    ("🧪 Reaction Engineering", "pages/05_Reaction_Engineering.py"),
+    ("🛡️ Process Safety", "pages/06_Process_Safety.py"),
+    ("⚙️ Equipment Sizing", "pages/07_Equipment_Sizing.py"),
+    ("🪨 Solids Handling", "pages/08_Solids_Handling.py"),
+    ("💧 Utility Systems", "pages/09_Utility_Systems.py"),
+    ("📡 Instrumentation & Control", "pages/10_Instrumentation_Control.py"),
+    ("💰 Economics & Optimization", "pages/11_Economics_Optimization.py"),
+    ("🌍 Environmental & Energy", "pages/12_Environmental_Energy.py"),
+]
 
 
 def get_domain_order() -> list[str]:

@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("🧪 Reaction Engineering", "Reactor sizing, kinetic regression, catalyst effectiveness, and reactor thermal safety.")
-render_domain_page("Reaction Engineering", "Chemical Reaction Engineering & Kinetics", REGISTRY, "🧪")
+render_domain_page("Reaction Engineering", "Chemical Reaction Engineering & Kinetics", REGISTRY, "🧪", page_path="pages/05_Reaction_Engineering.py")

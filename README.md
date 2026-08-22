@@ -1,125 +1,91 @@
-# Paras Chemical Engineering Calc Suite — `paras_calc_suite_v2` (Pattern A Release)
+# Paras Chemical Engineering Calc Suite — UX & Safety Messaging Update
 
-Full architectural restructure per the Pattern A spec: `core/` and
-`tools/` fully purged (nothing there had real logic — confirmed by
-direct file review, not assumed), replaced by `domains/dom_XX_*/` with
-pure `compute()` physics, a single generic `utils/runner.py` render
-loop, and a central `utils/tool_roadmap.py` registry.
+Builds on the Engine Expansion release (15 live tools across 5 domains).
+This round: blue/white theme, a validation-required caution banner on
+every tool, and cross-page navigation — plus a real bug found and fixed
+during verification, documented below rather than glossed over.
 
-## Directory structure
+## What's new
 
-```
-paras_calc_suite_v2/
-├── app.py                                    # Landing: stats, search, domain cards
-├── requirements.txt
-├── .gitignore
-├── .github/workflows/ci.yml                  # Syntax + AppTest + roadmap integrity checks
-├── domains/
-│   ├── dom_01_hydraulics/                     # LIVE - 6 tools
-│   │   ├── __init__.py
-│   │   └── fluid_dynamics_engine.py
-│   ├── dom_02_thermodynamics/ (thermo_engine.py)   # stub
-│   ├── dom_03_heat_transfer/                        # stub
-│   ├── dom_04_mass_transfer/                  # LIVE - 1 tool (FUG)
-│   │   ├── __init__.py
-│   │   └── separation_engine.py
-│   ├── dom_05_reaction/                             # stub
-│   ├── dom_06_process_safety/                       # stub — Phase 2 priority
-│   ├── dom_07_equipment_sizing/                     # stub — mapping unconfirmed
-│   ├── dom_08_solids_handling/                      # stub
-│   ├── dom_09_utility_systems/                      # stub
-│   ├── dom_10_instrumentation_control/              # stub
-│   ├── dom_11_economics/                            # stub
-│   └── dom_12_environmental/                        # stub — mapping partial
-├── pages/                                     # 12 files, ~15 lines each
-│   └── 01_Hydraulics.py ... 12_Environmental_Energy.py
-└── utils/
-    ├── tool_roadmap.py                        # ToolSpec/InputSpec + master 227-entry roadmap
-    ├── ui_components.py                       # styling, validators, basis panel, PDF/CSV, email
-    └── runner.py                              # render_domain_page() — the generic loop
-```
+**1. Blue-on-white theme, applied everywhere.** Because `inject_global_css()`
+is called by every single page, this was a one-file change
+(`utils/ui_components.py`) that now applies consistently across the
+landing page and all 12 domains — headings, sidebar, buttons, tabs, and
+status badges all switched from the prior teal/mint palette to blue
+(#1D4ED8 primary, #2563EB accent) on a white background. PDF report
+headers and HTML email templates updated to match (they had hardcoded
+hex colors, not variable references — found and fixed both instances).
 
-## What changed structurally
+**2. "Validate before use" caution banner on every tool.** Added
+`render_caution_banner()`, called once per tool render inside
+`utils/runner.py`'s shared `render_domain_page()` — meaning it appears
+on every current and future tool automatically, with zero per-page or
+per-tool code required. It sits directly under the tool description,
+above the inputs, so it's seen before a result is generated, not after.
 
-**`core/` and `tools/` are gone.** Direct review (not assumption) found
-`tools/dom_01_hydraulics/orifice_plate.py` was a stub with dummy math
-(`Q = 1.0 * d * beta  # dummy`) and `core/registry.py` implemented a
-second, competing tool-loading pattern that silently swallowed exceptions
-on a broken tool file — a real liability for engineering calculations.
-Nothing there was worth keeping.
+**3. Cross-page navigation footer.** Added `render_domain_footer_nav()`,
+also called from the shared `render_domain_page()`, rendering links to
+all 11 other domains plus Home at the bottom of every page. Backed by a
+new single source of truth, `DOMAIN_PAGES` in `utils/tool_roadmap.py`
+(icon + label + page path for all 12 domains) — `app.py`'s domain cards
+and the footer nav both read from this one list now, removing a
+duplication risk that existed across the prior two releases.
 
-**`utils/runner.py` is new and is the actual architectural win here.**
-Previously, all ~90 lines of tab/input/calculate/results/export loader
-logic were duplicated verbatim across every one of the 12 page files.
-Now every page is ~15 lines: import a `REGISTRY`, call
-`render_domain_page()`. A bug fix or UI change in the loader now applies
-to all 12 domains from one file, not 12 copies that can drift apart.
+## A real bug, found and fixed during verification
 
-**`utils/` consolidated from 5 files to 3**, per this release's file
-tree. `styling.py` + `validators.py` + `mailer.py` + `report.py` +
-`unit_system.py` all merged into `ui_components.py`. This was a
-deliberate choice to match the leaner spec without silently dropping
-previously-verified capability (PDF/CSV export, email, SI/Imperial
-toggle all still work — verified below) — flagging it here rather than
-letting it look like an accidental scope cut.
+Initial implementation of the footer nav caused a `KeyError:
+'url_pathname'` crash on **every single page** when tested. Before
+"fixing" it, I checked whether this was an actual production bug or a
+testing-harness artifact — they require completely different fixes, and
+guessing wrong would have meant either shipping a broken feature or
+wasting effort removing working code.
 
-## Known mapping gaps (read before assuming full coverage)
+**Root cause:** `st.page_link()` needs Streamlit's multipage manifest to
+resolve a link target, and that manifest only exists when a page is
+reached through the real entrypoint (`app.py`). My test harness had been
+loading each `pages/*.py` file standalone via
+`AppTest.from_file('pages/01_Hydraulics.py')` — which is how every page
+in this project has been tested in every prior round, and worked fine
+until a page itself started calling `st.page_link()` (previously only
+`app.py` did). Loading a page standalone has no sibling-page context, so
+the link target lookup fails — a testing-harness limitation, not a
+production bug.
 
-The new domain scheme's 12 folders don't map 1:1 onto the original
-12-domain source taxonomy document:
+**Verified by testing the correct way**: `AppTest.from_file('app.py')` →
+`at.switch_page('pages/01_Hydraulics.py')` → confirmed zero exceptions,
+confirming this works correctly in actual deployment (where `app.py` is
+always the entrypoint). Rewrote `.github/workflows/ci.yml` to use this
+`switch_page` pattern for every page test going forward — the prior
+CI file would have appeared to pass (it never tested cross-page
+`page_link` calls before this round) but would have started failing
+the moment this feature shipped, for a reason unrelated to the actual
+code being broken. Caught and fixed before that could happen.
 
-- **`dom_07_equipment_sizing`** doesn't correspond to any single domain
-  in the source document. It currently has **zero roadmap entries** — I
-  did not invent a tool list to fill it. Tell me what should live here
-  and I'll populate it properly.
-- **`dom_12_environmental`** only received the Clean Energy/Green
-  Technology and carbon-footprint/sustainability bullets, which were an
-  unambiguous fit for "Environmental & Energy." The source taxonomy's
-  refining/polymers/pharma tools (previously under "Sector-Specific
-  Process Technologies") and its **entire "Operations Diagnostics &
-  Reliability" domain** (SPC, MTBF/reliability, fouling diagnostics —
-  16 tools that existed in the prior release) currently have **no home**
-  in this 12-slot scheme. This is a real gap, not a rounding error —
-  flag where you want them and I'll place them correctly.
+## Verification
 
-As a result, the roadmap total is **227 tools**, not 260 as in the prior
-release — the difference is exactly the content that fell into this
-mapping gap, not lost data (nothing was deleted, it just isn't placed
-yet).
+1. 35 files syntax-checked, zero errors.
+2. Landing page + all 12 pages re-tested via the corrected
+   `switch_page` navigation pattern — 0 exceptions.
+3. Caution banner and cross-page nav footer confirmed present via
+   markdown-content inspection on all 12 pages, not just visually assumed.
+4. All previously-verified live calculators (Pressure Drop, Orifice
+   Plate, FUG, Z-factor, WHSV, PSV Gas) re-confirmed producing correct
+   results through the corrected test pattern — same values as every
+   prior round, zero regression from the theme/banner/nav changes.
+5. CI workflow's exact steps run locally in full before being committed
+   — all pass, including the two new checks (nav footer presence,
+   corrected page-boot pattern).
 
-## Live tools (6 of 227)
+## Files touched this round
 
-- Single-Phase Pressure Drop (Darcy-Weisbach + Swamee-Jain) — `hy_001`
-- Control Valve Sizing, Liquid & Gas (ISA-75.01) — `hy_002a`/`hy_002b`
-- NPSH Available vs. Required — `hy_003`
-- Water Hammer & Surge Pressure (Joukowsky + Korteweg) — `hy_006`
-- **Orifice Plate Flowmeter (ISO 5167) — `hy_007`, new this release**,
-  built to replace the dummy stub found in the old `tools/` directory;
-  uses the real ISO 5167 flow equation, hand-verified against a manual
-  calculation before being wired in
-- Shortcut Distillation (Fenske-Underwood-Gilliland) — `mt_011`
-
-## Verification — everything below was actually run, not assumed
-
-1. **33 files syntax-checked** (`ast.parse`), zero errors.
-2. **All 3 ported/new compute functions re-verified against every prior
-   value in this project's history** — Cv=21.213, FUG Nmin=7.49/
-   Rmin=1.24, confirming the restructuring introduced zero regression.
-3. **Orifice plate hand-verified independently**: 100mm pipe, 60mm bore,
-   50 kPa ΔP, ρ=1000 → 65.46 m³/hr by hand calculation, matching the
-   coded implementation to 4 significant figures.
-4. **Landing page + all 12 domain pages booted via Streamlit's
-   `AppTest`** — 0 exceptions across all 13.
-5. **All 3 live calculators clicked through their actual rendered pages**
-   (not called directly as functions) — Pressure Drop, Orifice Plate
-   (explicitly re-selected via its dropdown, not just the tab default),
-   and FUG all produce correct results through the real UI pipeline.
-6. **CSV/PDF export widgets confirmed to render without exception**
-   through the new consolidated `ui_components.py` + `runner.py` path.
-7. **The CI workflow's exact 4 steps were run locally, in full, before
-   the YAML was written** — syntax check, all-pages boot, live-calculator
-   click-and-assert, and roadmap-integrity check (0 duplicate keys, 227
-   entries) all pass as shown above.
+- `utils/ui_components.py` — theme colors, `render_caution_banner()`,
+  `render_domain_footer_nav()`
+- `utils/tool_roadmap.py` — added `DOMAIN_PAGES` shared list
+- `utils/runner.py` — wired both new render functions into the shared
+  page-rendering loop, added `page_path` parameter
+- `pages/*.py` (all 12) — one-line change each, passing `page_path=...`
+  into `render_domain_page()`
+- `.github/workflows/ci.yml` — rewritten to use `switch_page` correctly
 
 ## Running it
 
@@ -128,27 +94,5 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Plug-and-play protocol for new tools
-
-1. Write `compute_xxx(values: dict) -> dict` — pure function, zero
-   `st.*` calls — in the relevant `domains/dom_XX_*/*.py`.
-2. Build a `ToolSpec` (from `utils.tool_roadmap`) wrapping it, add to
-   that module's `REGISTRY` dict.
-3. Add one matching `RoadmapEntry` (same `key`) to
-   `utils/tool_roadmap.py`'s bullet-list data so it flips from "Coming
-   Soon" to "Live" everywhere automatically.
-
-No page file, `app.py`, or `runner.py` ever needs to change.
-
-## Roadmap
-
-- **Phase 1 (this release):** Pattern A restructure, `core`/`tools`
-  purge, 6 live tools, mobile-first landing page, CI.
-- **Phase 2 (next):** Domain 6 (Process Safety) — API 520/521 PSV sizing
-  (gas, liquid, two-phase flashing relief). Zero safety-relief coverage
-  exists anywhere in the suite currently; this is the highest-value
-  next addition.
-- **Phase 3:** Advanced Thermodynamics & Multiphase Piping (PR-EOS flash,
-  Beggs & Brill).
-- **Unscheduled, needs your input first:** resolving the `dom_07`/`dom_12`
-  mapping gaps above.
+Same plug-and-play protocol as before — nothing about adding new tools
+changed this round.

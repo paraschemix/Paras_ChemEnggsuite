@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("📡 Instrumentation & Control", "Dynamic system response, PID tuning, control loop analysis, and signal processing.")
-render_domain_page("Instrumentation & Control", "Process Dynamics, Instrumentation & Control", REGISTRY, "📡")
+render_domain_page("Instrumentation & Control", "Process Dynamics, Instrumentation & Control", REGISTRY, "📡", page_path="pages/10_Instrumentation_Control.py")

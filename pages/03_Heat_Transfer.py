@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("🔥 Heat Transfer", "Exchanger rating, fired heaters, air coolers, and insulation/heat loss.")
-render_domain_page("Heat Transfer", "Heat Transfer & Thermal Equipment", REGISTRY, "🔥")
+render_domain_page("Heat Transfer", "Heat Transfer & Thermal Equipment", REGISTRY, "🔥", page_path="pages/03_Heat_Transfer.py")

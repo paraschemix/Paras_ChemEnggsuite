@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("⚗️ Mass Transfer", "Distillation, absorption/stripping, extraction, adsorption, drying, and membranes.")
-render_domain_page("Mass Transfer", "Mass Transfer & Separation Operations", REGISTRY, "⚗️")
+render_domain_page("Mass Transfer", "Mass Transfer & Separation Operations", REGISTRY, "⚗️", page_path="pages/04_Mass_Transfer.py")

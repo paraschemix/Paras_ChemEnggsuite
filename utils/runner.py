@@ -19,17 +19,26 @@ whole point of "Generic UI & Runner" as a named architectural component.
 
 import streamlit as st
 
-from utils.ui_components import render_engineering_basis, render_report_widget, render_email_widget
+from utils.ui_components import (
+    render_engineering_basis, render_report_widget, render_email_widget,
+    render_caution_banner, render_domain_footer_nav,
+)
 
 
-def render_domain_page(domain_title: str, description: str, registry: dict, icon: str = "") -> None:
-    """Renders a full domain page body (everything below the page header)."""
+def render_domain_page(domain_title: str, description: str, registry: dict, icon: str = "", page_path: str = "") -> None:
+    """Renders a full domain page body (everything below the page header).
+
+    `page_path` (e.g. "pages/01_Hydraulics.py") lets the cross-page
+    navigation footer exclude the current page from its own link list —
+    pass the page's own filename when calling this from pages/*.py.
+    """
     if not registry:
         st.info(
             "Tools for this domain are being built out. Follow the pattern in "
             "domains/dom_01_hydraulics/fluid_dynamics_engine.py to add them — this page "
             "renders them automatically once the domain's REGISTRY is populated."
         )
+        render_domain_footer_nav(page_path)
         return
 
     categories: dict[str, list[str]] = {}
@@ -49,6 +58,7 @@ def render_domain_page(domain_title: str, description: str, registry: dict, icon
             )
             tool = registry[selected_key]
             st.caption(tool.description)
+            render_caution_banner()
             st.markdown("---")
 
             st.markdown("#### Inputs")
@@ -107,3 +117,5 @@ def render_domain_page(domain_title: str, description: str, registry: dict, icon
                 render_email_widget(tool.title, last_inputs, last_results, key_prefix=tool.key)
             else:
                 st.caption("Run a calculation above to enable exporting or emailing a report.")
+
+    render_domain_footer_nav(page_path)

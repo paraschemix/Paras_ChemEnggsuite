@@ -10,4 +10,4 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
 render_page_header("🔧 Hydraulics", "Line sizing, pressure losses, multiphase hydraulics, pumps, compressors, and flow measurement.")
-render_domain_page("Hydraulics", "Fluid Mechanics, Hydraulics & Piping Systems", REGISTRY, "🔧")
+render_domain_page("Hydraulics", "Fluid Mechanics, Hydraulics & Piping Systems", REGISTRY, "🔧", page_path="pages/01_Hydraulics.py")
