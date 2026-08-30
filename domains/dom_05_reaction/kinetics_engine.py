@@ -12,6 +12,7 @@ Live tools:
 
 from utils.tool_roadmap import ToolSpec, InputSpec
 from utils.ui_components import check_positive, run_validators
+import math
 
 
 # =======================================================================
@@ -136,8 +137,96 @@ TOOL_ADIABATIC_RISE = ToolSpec(
 )
 
 
+# =======================================================================
+# TOOL: CSTR vs. PFR VOLUME COMPARISON (n-th ORDER, ISOTHERMAL, CONSTANT DENSITY)
+# =======================================================================
+
+def compute_cstr_vs_pfr(values: dict) -> dict:
+    """
+    Constant-density, isothermal, n-th order reaction: -r_A = k*C_A^n.
+
+    tau_PFR  = (C_A0^(1-n)/k) * [1-(1-X)^(1-n)]/(1-n)   for n != 1
+    tau_PFR  = (1/k) * (-ln(1-X))                          for n == 1
+    tau_CSTR = (C_A0^(1-n)/k) * X/(1-X)^n
+
+    V = tau * v0 (volumetric flow rate)
+    """
+    k_rate = values["k_rate"]
+    reaction_order_n = values["reaction_order_n"]
+    c_a0 = values["c_a0"]
+    conversion_x = values["conversion_x"]
+    volumetric_flow = values["volumetric_flow"]
+
+    has_error, has_warning, errors, warnings = run_validators(
+        check_positive(k_rate, "Rate constant"), check_positive(c_a0, "Inlet concentration"),
+        check_positive(volumetric_flow, "Volumetric flow rate"),
+    )
+    if has_error:
+        raise ValueError("; ".join(errors))
+    if not (0 < conversion_x < 1):
+        raise ValueError("Conversion (X) must be strictly between 0 and 1.")
+
+    if abs(reaction_order_n - 1.0) < 1e-9:
+        tau_pfr = (1.0 / k_rate) * (-math.log(1 - conversion_x))
+    else:
+        tau_pfr = (c_a0 ** (1 - reaction_order_n) / k_rate) * (
+            (1 - (1 - conversion_x) ** (1 - reaction_order_n)) / (1 - reaction_order_n)
+        )
+
+    tau_cstr = (c_a0 ** (1 - reaction_order_n) / k_rate) * (conversion_x / (1 - conversion_x) ** reaction_order_n)
+
+    v_pfr = tau_pfr * volumetric_flow
+    v_cstr = tau_cstr * volumetric_flow
+    ratio = v_cstr / v_pfr if v_pfr > 0 else float("inf")
+
+    extra_warning = None
+    if conversion_x > 0.95:
+        extra_warning = (
+            f"Conversion of {conversion_x*100:.1f}% is very high - both tau_PFR and (especially) tau_CSTR "
+            "become very sensitive to X near complete conversion; small input changes will swing the result significantly."
+        )
+
+    return {
+        "PFR Space Time, tau (time units)": round(tau_pfr, 4),
+        "CSTR Space Time, tau (time units)": round(tau_cstr, 4),
+        "PFR Volume": round(v_pfr, 3),
+        "CSTR Volume": round(v_cstr, 3),
+        "CSTR/PFR Volume Ratio": round(ratio, 3),
+        "_warnings": warnings + ([extra_warning] if extra_warning else []),
+    }
+
+
+TOOL_CSTR_VS_PFR = ToolSpec(
+    key="kr_004",
+    title="CSTR vs. PFR Volume Comparison (n-th Order)",
+    category="Ideal Reactor Sizing",
+    description="Compares required CSTR and PFR volumes for the same conversion, isothermal n-th order reaction, constant density.",
+    inputs=[
+        InputSpec("k_rate", "Rate Constant (k)", default=0.1, min_value=1e-6,
+                   help="Units depend on reaction order n: for n=1, 1/time; for n=2, volume/(mol*time); etc."),
+        InputSpec("reaction_order_n", "Reaction Order (n)", default=1.0, min_value=0.0, max_value=3.0, step=0.1),
+        InputSpec("c_a0", "Inlet Concentration (C_A0)", default=2.0, min_value=1e-6, unit="(mol/vol)"),
+        InputSpec("conversion_x", "Target Conversion (X)", default=0.90, min_value=0.001, max_value=0.999, step=0.001),
+        InputSpec("volumetric_flow", "Volumetric Flow Rate (v0)", default=100.0, min_value=1e-6, unit="(vol/time)"),
+    ],
+    compute=compute_cstr_vs_pfr,
+    formula_md=(
+        r"$$\tau_{PFR} = \dfrac{C_{A0}^{1-n}}{k}\cdot\dfrac{1-(1-X)^{1-n}}{1-n} \quad (n\neq 1), "
+        r"\quad \tau_{PFR}=\dfrac{-\ln(1-X)}{k}\ (n=1)$$"
+        r"$$\tau_{CSTR} = \dfrac{C_{A0}^{1-n}}{k}\cdot\dfrac{X}{(1-X)^n}, \quad V=\tau \cdot v_0$$"
+    ),
+    references=["Fogler, H.S., Elements of Chemical Reaction Engineering, Ch. 2-4", "Levenspiel, O., Chemical Reaction Engineering"],
+    assumptions=[
+        "Isothermal, constant-density (liquid-phase or constant-volume gas-phase) system - not valid for reactions with significant volume change or non-isothermal operation.",
+        "Single, irreversible n-th order reaction - does not account for reversible reactions, multiple reactions, or catalyst deactivation.",
+        "For positive-order reactions (n>0), CSTR volume will always exceed PFR volume for the same conversion - this is the classic result from the Levenspiel-plot comparison of reactor performance.",
+    ],
+)
+
+
 REGISTRY: dict[str, ToolSpec] = {
     TOOL_WHSV.key: TOOL_WHSV,
     TOOL_CONVERSION.key: TOOL_CONVERSION,
     TOOL_ADIABATIC_RISE.key: TOOL_ADIABATIC_RISE,
+    TOOL_CSTR_VS_PFR.key: TOOL_CSTR_VS_PFR,
 }

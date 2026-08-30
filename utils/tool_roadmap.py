@@ -37,14 +37,15 @@ from typing import Callable, Optional, Any
 class InputSpec:
     name: str                      # dict key passed into compute()
     label: str                     # UI label
-    default: float                 # default value shown in the widget
+    default: float                 # default value shown in the widget (used for "number"/"select"; ignored for "text")
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     step: Optional[float] = None
     unit: str = ""                 # appended to label for display, e.g. "(psia)"
     help: str = ""                 # tooltip
-    input_type: str = "number"     # "number" | "select"
+    input_type: str = "number"     # "number" | "select" | "text"
     options: Optional[list] = None  # required if input_type == "select"
+    default_text: Optional[str] = None  # used instead of `default` when input_type == "text"
 
     def display_label(self) -> str:
         return f"{self.label} {self.unit}".strip() if self.unit else self.label
@@ -110,7 +111,7 @@ _DOMAIN_1_BULLETS = [
     "Two-phase pressure drop (Lockhart-Martinelli), horizontal multiphase flow regime mapper (Baker chart), vertical multiphase flow regime mapper (Taitel-Dukler), Beggs & Brill multiphase piping solver, slug flow frequency & liquid holdup calculator, erosion-corrosion velocity limits (API RP 14E)",
     "Pump total dynamic head (TDH) & power rating, Net Positive Suction Head (NPSHa/NPSHr) margin estimator, pump affinity laws scaling tool, multi-pump parallel/series curve overlay, viscosity correction for centrifugal pumps (Hydraulic Institute), positive displacement pump slip & flow sizing",
     "Centrifugal compressor head & power (Polytropic vs. Isentropic), multi-stage compression with intercooling optimizer, reciprocating compressor volumetric efficiency & rod load, compressor surge line margin predictor, blower performance & air density correction",
-    "Water hammer / surge pressure wave analyzer, network hydraulic solver (Hardy-Cross pipe loop analysis), control valve sizing for liquids/gases/steam (ISA-75.01 standard), orifice plate differential pressure calculator (ISO 5167), Venturi tube & flow nozzle design, Rotameter calibration & gas density corrector, pitot tube traverse flow integrator",
+    "Water hammer / surge pressure wave analyzer, network hydraulic solver (Hardy-Cross pipe loop analysis), control valve sizing for liquids/gases/steam (ISA-75.01 standard), orifice plate differential pressure calculator (ISO 5167), Venturi tube & flow nozzle design, Rotameter calibration & gas density corrector, pitot tube traverse flow integrator, Minimum line diameter for a target velocity limit",
 ]
 _DOMAIN_2_BULLETS = [
     "Peng-Robinson EOS PT/PV flash solver, Soave-Redlich-Kwong (SRK) EOS calculator, Benedict-Webb-Rubin-Starling (BWRS) gas property estimator, PC-SAFT polymer phase equilibrium engine, compressibility factor (Z) calculator (Standing-Katz / Hall-Yarborough)",
@@ -120,7 +121,7 @@ _DOMAIN_2_BULLETS = [
     "ASME steam tables (IAPWS-IF97), psychrometric chart & air property calculator, flue gas dew point & acid gas condensation solver",
 ]
 _DOMAIN_3_BULLETS = [
-    "Exchanger thermal rating (Kern method), Bell-Delaware detailed shell-side hydraulics, Log Mean Temperature Difference (LMTD) & F-factor corrector, epsilon-NTU effectiveness solver, fouling resistance impact predictor, tube-side pressure drop & velocity calculator, exchanger tube vibration analyzer (cross-flow / vortex shedding)",
+    "Exchanger thermal rating (Kern method), Bell-Delaware detailed shell-side hydraulics, Log Mean Temperature Difference (LMTD) & F-factor corrector, epsilon-NTU effectiveness solver, fouling resistance impact predictor, tube-side pressure drop & velocity calculator, exchanger tube vibration analyzer (cross-flow / vortex shedding), Heat Exchanger Duty and Required Area calculator",
     "Air cooler duty & face velocity sizing, finned tube heat transfer coefficient estimator, fan static pressure & power draft calculator, ambient air temperature derating estimator",
     "Plate Heat Exchanger (PHE) chevron angle rating, spiral heat exchanger design for slurries, double-pipe exchanger rating, jacketed vessel heat transfer coefficient solver",
     "Furnace radiant section heat flux density solver, convective section design & draft loss, fuel gas combustion efficiency & stack loss, Excess air vs. O2/CO2 analyzer, burner heat release rate & flue gas volume generator",
@@ -128,8 +129,8 @@ _DOMAIN_3_BULLETS = [
     "Multi-layer pipe insulation thickness optimizer, bare metal surface heat loss (Radiation + Convection), personnel burn protection temperature calculator",
 ]
 _DOMAIN_4_BULLETS = [
-    "McCabe-Thiele binary stage counter, Fenske-Underwood-Gilliland (FUG) shortcut distillation design, minimum reflux ratio (Rmin) estimator, column hydraulic tray rating (Sieve, Valve, Bubble Cap), jet flooding & downcomer backup analyzer, packed column diameter & HETP solver, pressure drop across packing (GPDC chart / Stichlmair model), reactive distillation equilibrium module, batch distillation time-cut optimizer",
-    "Kremser method for absorber/stripper theoretical stages, gas absorption column height (NOG, HOG), amine gas treating solvent circulation estimator, acid gas removal efficiency module, sour water stripper performance estimator",
+    "McCabe-Thiele binary stage counter, Fenske-Underwood-Gilliland (FUG) shortcut distillation design, minimum reflux ratio (Rmin) estimator, column hydraulic tray rating (Sieve - Valve - Bubble Cap), jet flooding & downcomer backup analyzer, packed column diameter & HETP solver, pressure drop across packing (GPDC chart / Stichlmair model), reactive distillation equilibrium module, batch distillation time-cut optimizer",
+    "Kremser method for absorber/stripper theoretical stages, gas absorption column height (NOG and HOG), amine gas treating solvent circulation estimator, acid gas removal efficiency module, sour water stripper performance estimator, Flash Drum / V-L Separator Sizing (Vertical and Horizontal - Souders-Brown)",
     "Ternary liquid extraction stage calculator, mixer-settler design & dispersion band thickness, extraction column diameter & flood point solver, solvent-to-feed (S/F) ratio optimizer",
     "Fixed-bed adsorption breakthrough curve generator, bed length of unused bed (LUB) calculator, pressure drop in granular beds (Ergun equation), ion exchange vessel sizing & regeneration mass balance",
     "Rotary dryer mass & heat balance, spray dryer droplet evaporation time, psychrometric drying air requirement tool, crystallization yield & magma density solver, cooling crystallizer supersaturation profile generator",
@@ -137,26 +138,26 @@ _DOMAIN_4_BULLETS = [
 ]
 _DOMAIN_5_BULLETS = [
     "Continuous Stirred Tank Reactor (CSTR) volume solver, Plug Flow Reactor (PFR) volume & conversion calculator, batch reactor cycle time & conversion solver, CSTRs-in-series cascade simulator, Space Velocity Calculator (WHSV), Conversion Selectivity and Yield calculator",
-    "Arrhenius equation parameter solver (Ea, A), differential & integral method kinetic order fitting, Langmuir-Hinshelwood rate expression calculator, power-law kinetic fitting tool",
+    "Arrhenius equation parameter solver (Ea and A), differential & integral method kinetic order fitting, Langmuir-Hinshelwood rate expression calculator, power-law kinetic fitting tool",
     "Thiele modulus & internal effectiveness factor (eta), Mears criterion for external mass transfer resistance, Weisz-Prater criterion for internal diffusion resistance, packed bed catalytic reactor pressure drop (Ergun), catalyst deactivation kinetics solver (coking/poisoning)",
     "Reactor heat generation vs. removal curve overlay, Adiabatic Temperature Rise calculator, runaway reaction threshold analysis, Semenov / Frank-Kamenetskii thermal explosion limit tool",
     "Monod cell growth kinetics calculator, oxygen transfer rate (OTR) & volumetric mass transfer coefficient (kLa) solver, bioreactor agitation power input calculator",
 ]
 _DOMAIN_6_BULLETS = [
-    "API 520 vapor/gas PSV orifice sizing, API 520 liquid PSV orifice sizing, API 520 steam PSV sizing, API 2000 low-pressure tank venting (Emergency/Normal), thermal expansion liquid relief valve sizing, two-phase flow PSV sizing (DIERS / Omega method), PSV backpressure correction factor (Kw, Kb) solver, inlet pipe pressure drop check (3% rule)",
+    "API 520 vapor/gas PSV orifice sizing, API 520 liquid PSV orifice sizing, API 520 steam PSV sizing, API 2000 low-pressure tank venting (Emergency/Normal), thermal expansion liquid relief valve sizing, two-phase flow PSV sizing (DIERS / Omega method), PSV backpressure correction factor (Kw and Kb) solver, inlet pipe pressure drop check (3% rule)",
     "Flare stack height & thermal radiation contours (API 521), flare tip noise level predictor, vessel blowdown rate & temperature drop calculator, flare knockout drum sizing (Vertical/Horizontal), flare header hydraulic network calculator",
     "Gaussian plume atmospheric dispersion solver, heavy gas dispersion model (Britter-McQuaid), vapor cloud explosion (VCE) overpressure estimator (TNT equivalent / TNO Multi-Energy), BLEVE thermal radiation dose calculator, pool fire heat flux & burning rate calculator",
     "Layers of Protection Analysis (LOPA) risk reduction calculator, Safety Integrity Level (SIL) target calculator, HAZOP action item tracking matrix, Quantitative Risk Assessment (QRA) Individual Risk (IR) metric generator",
 ]
 _DOMAIN_8_BULLETS = [
-    "Particle size distribution (Sauter mean diameter d32), Rosin-Rammler distribution curve fitter, Bond Work Index grinding power estimator, jaw crusher & ball mill throughput calculator",
+    "Particle size distribution (Sauter mean diameter d32), Rosin-Rammler distribution curve fitter, Bond Work Index grinding power estimator, jaw crusher & ball mill throughput calculator, Terminal Settling Velocity calculator (Stokes' Law)",
     "Minimum fluidization velocity (umf) calculator, terminal settling velocity of particles (Stokes / Allen / Newton regimes), pneumatic conveying pressure drop & saltation velocity, cyclone separator collection efficiency (Lapple / Leith-Licht)",
     "Hydrocyclone performance curve estimator, continuous thickener area sizing (Coe-Clevenger method), rotary vacuum filter yield & cycle time solver, baghouse filter area & air-to-cloth ratio estimator, centrifuge G-force & cake dryness estimator",
     "Hopper angle & discharge rate solver (Jenike method), silo minimum arching & piping dimension calculator, bulk solid density & compressibility index estimator",
 ]
 _DOMAIN_9_BULLETS = [
-    "Steam boiler efficiency (Direct & Indirect methods), steam pressure reducing valve (PRV) desuperheater balance, steam trap capacity & flash steam recovery generator, condensate pipe diameter & two-phase return line solver, deaerator mass & energy balance",
-    "Cooling tower evaporation, blowdown, and drift loss calculator, cycles of concentration (COC) optimizer, Langelier Saturation Index (LSI) & Ryznar Stability Index (RSI) water scaling calculator, cooling water dosing estimator",
+    "Steam boiler efficiency (Direct & Indirect methods), Saturated Steam Properties Lookup, steam pressure reducing valve (PRV) desuperheater balance, steam trap capacity & flash steam recovery generator, condensate pipe diameter & two-phase return line solver, deaerator mass & energy balance",
+    "Cooling tower evaporation and blowdown and drift loss calculator, cycles of concentration (COC) optimizer, Langelier Saturation Index (LSI) & Ryznar Stability Index (RSI) water scaling calculator, cooling water dosing estimator",
     "Air compressor power & receiver tank sizing, compressed air piping network pressure drop, pressure swing adsorption (PSA) nitrogen generator rating, air dryer dew point & purge loss estimator",
     "Composite curves & Grand Composite Curve (GCC) generator, minimum hot/cold utility target calculator, heat exchanger network (HEN) pinch temperature finder, cogeneration (CHP) fuel utilization efficiency solver",
 ]
@@ -177,15 +178,25 @@ _DOMAIN_11_BULLETS = [
 # & Energy." The rest of old Domain 11 (refining, polymers, pharma) and
 # ALL of old Domain 12 (Operations Diagnostics & Reliability) have no
 # confirmed home in this 12-slot scheme — see README.
+# dom_07_equipment_sizing: previously empty (no confirmed source-taxonomy
+# mapping). Populated per the v7 sprint spec with the two tools actually
+# implemented this round - this is content added beyond the original
+# source document, same as several other tools in this suite (WHSV,
+# Antoine, NPV, etc. - see prior README notes).
+_DOMAIN_7_BULLETS = [
+    "Sieve Tray Hydraulics (dry/wet pressure drop and flooding and weeping check), Liquid Surge Drum Sizing (Horizontal and Vertical)",
+]
+
 _DOMAIN_12_BULLETS = [
     "Process carbon footprint (tCO2e per ton of product) calculator, Scope 1 & Scope 2 greenhouse gas emissions tracker, Life Cycle Assessment (LCA) mass impact evaluator",
     "Water electrolyzer power requirement & hydrogen yield calculator, Carbon Capture Amine/Solvent mass balance, biomass gasification syngas composition predictor, fuel cell power & oxygen consumption solver",
+    "Flare Stack Thermal Radiation calculator (API 521 point-source model), Chimney/Vent Gas Dispersion calculator (Gaussian plume model)",
 ]
 
 _DOMAIN_BULLET_MAP = {
     1: _DOMAIN_1_BULLETS, 2: _DOMAIN_2_BULLETS, 3: _DOMAIN_3_BULLETS,
     4: _DOMAIN_4_BULLETS, 5: _DOMAIN_5_BULLETS, 6: _DOMAIN_6_BULLETS,
-    7: [],  # dom_07_equipment_sizing - no confirmed source content, see README
+    7: _DOMAIN_7_BULLETS,  # dom_07_equipment_sizing - populated in v7, see note above
     8: _DOMAIN_8_BULLETS, 9: _DOMAIN_9_BULLETS, 10: _DOMAIN_10_BULLETS,
     11: _DOMAIN_11_BULLETS, 12: _DOMAIN_12_BULLETS,
 }
@@ -206,14 +217,39 @@ _LIVE_TOOL_KEY_MAP = {
     "orifice plate differential pressure calculator (ISO 5167)": "hy_007",
     "Pump total dynamic head (TDH) & power rating": "hy_004",
     "Centrifugal compressor head & power (Polytropic vs. Isentropic)": "hy_005",
+    "erosion-corrosion velocity limits (API RP 14E)": "hy_008",
+    "Minimum line diameter for a target velocity limit": "hy_009",
     "Fenske-Underwood-Gilliland (FUG) shortcut distillation design": "mt_011",
     "compressibility factor (Z) calculator (Standing-Katz / Hall-Yarborough)": "tp_001",
     "Vapor pressure and dew point estimator (Antoine equation)": "tp_002",
+    "Log Mean Temperature Difference (LMTD) & F-factor corrector": "ht_001",
+    "Heat Exchanger Duty and Required Area calculator": "ht_002",
     "API 520 vapor/gas PSV orifice sizing": "ps_001",
     "thermal expansion liquid relief valve sizing": "ps_002",
     "Space Velocity Calculator (WHSV)": "kr_001",
     "Conversion Selectivity and Yield calculator": "kr_002",
     "Adiabatic Temperature Rise calculator": "kr_003",
+    "Saturated Steam Properties Lookup": "ut_001",
+    "steam trap capacity & flash steam recovery generator": "ut_002",
+    "Kremser method for absorber/stripper theoretical stages": "mt_012",
+    "Flash Drum / V-L Separator Sizing (Vertical and Horizontal - Souders-Brown)": "mt_013",
+    "McCabe-Thiele binary stage counter": "mt_014",
+    "Terminal Settling Velocity calculator (Stokes' Law)": "sh_001",
+    "Minimum fluidization velocity (umf) calculator": "sh_002",
+    "First-order plus dead time (FOPDT) system step response generator": "ic_001",
+    "Ziegler-Nichols open/closed loop tuning calculator": "ic_002",
+    "Chemical Engineering Plant Cost Index (CEPCI) escalation corrector": "ec_001",
+    "capacity exponent scaling calculator": "ec_002",
+    "Net Present Value (NPV) & Internal Rate of Return (IRR) calculator": "ec_003",
+    "Continuous Stirred Tank Reactor (CSTR) volume solver": "kr_004",
+    "Sieve Tray Hydraulics (dry/wet pressure drop and flooding and weeping check)": "eq_001",
+    "Liquid Surge Drum Sizing (Horizontal and Vertical)": "eq_002",
+    "Flare Stack Thermal Radiation calculator (API 521 point-source model)": "en_001",
+    "Chimney/Vent Gas Dispersion calculator (Gaussian plume model)": "en_002",
+    "Multi-layer pipe insulation thickness optimizer": "ht_004",
+    "Air cooler duty & face velocity sizing": "ht_003",
+    "Cooling tower evaporation and blowdown and drift loss calculator": "ut_003",
+    "Bode plot stability analyzer (Gain & Phase margin)": "ic_003",
 }
 
 

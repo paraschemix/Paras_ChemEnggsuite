@@ -41,11 +41,11 @@ from fpdf import FPDF
 #    used consistently across every page via the shared inject_global_css().
 # =======================================================================
 
-PRIMARY_TEAL = "#1D4ED8"        # blue-700 - headings, sidebar bg
-PRIMARY_TEAL_DARK = "#1E3A8A"   # blue-900 - button hover, active states
-ACCENT_MINT = "#2563EB"         # blue-600 - buttons, links, active tabs
-ACCENT_MINT_LIGHT = "#DBEAFE"   # blue-100 - icon/status badge backgrounds
-SLATE_BG = "#FFFFFF"            # white page background, as requested
+PRIMARY_TEAL = "#1E3A5F"        # navy - headings, sidebar bg
+PRIMARY_TEAL_DARK = "#152A45"   # darker navy - button hover, active states
+ACCENT_MINT = "#2C5282"         # muted navy-blue - buttons, links, active tabs
+ACCENT_MINT_LIGHT = "#DBEAFE"   # pale blue - icon/status badge backgrounds
+SLATE_BG = "#FFFFFF"            # white page background
 CARD_BG = "#ffffff"
 TEXT_BODY = "#334155"           # slate-700 - body text, readable on white
 SUCCESS_GREEN = "#16a34a"
@@ -98,14 +98,14 @@ def inject_global_css() -> None:
         div[data-testid="stMetric"] {{
             background: {CARD_BG}; border: 1px solid #e2e8f0; border-radius: 16px;
             padding: 16px 18px;
-            box-shadow: 0 4px 6px -1px rgba(29, 78, 216, 0.1), 0 2px 4px -2px rgba(29, 78, 216, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(30, 58, 95, 0.1), 0 2px 4px -2px rgba(30, 58, 95, 0.1);
         }}
         div[data-testid="stMetricLabel"] {{ color: {TEXT_BODY} !important; font-weight: 600; font-size: 0.8rem !important; }}
         div[data-testid="stMetricValue"] {{ color: {PRIMARY_TEAL} !important; font-size: 1.4rem !important; word-break: break-word; }}
 
         div[data-testid="stVerticalBlockBorderWrapper"] {{
             border-radius: 16px !important; border: 1px solid #edf2f4 !important;
-            box-shadow: 0 4px 6px -1px rgba(29, 78, 216, 0.1), 0 2px 4px -2px rgba(29, 78, 216, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(30, 58, 95, 0.1), 0 2px 4px -2px rgba(30, 58, 95, 0.1);
         }}
 
         .stButton > button, .stDownloadButton > button {{
@@ -399,7 +399,7 @@ def generate_pdf_bytes(calc_title: str, input_params: dict, results_dict: dict, 
     pdf = FPDF()
     pdf.add_page()
 
-    pdf.set_fill_color(29, 78, 216)  # PRIMARY_TEAL (blue-700) as RGB
+    pdf.set_fill_color(30, 58, 95)  # PRIMARY_TEAL (navy) as RGB
     pdf.rect(0, 0, 210, 26, style="F")
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Helvetica", "B", 16)
@@ -415,7 +415,7 @@ def generate_pdf_bytes(calc_title: str, input_params: dict, results_dict: dict, 
     pdf.cell(0, 6, _sanitize_pdf_text(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"), ln=True)
     pdf.ln(4)
 
-    def _section(title: str, items: dict, value_color=(29, 78, 216)):
+    def _section(title: str, items: dict, value_color=(30, 58, 95)):
         pdf.set_font("Helvetica", "B", 12)
         pdf.set_text_color(30, 41, 59)
         pdf.cell(0, 8, _sanitize_pdf_text(title), ln=True)
@@ -435,7 +435,7 @@ def generate_pdf_bytes(calc_title: str, input_params: dict, results_dict: dict, 
         pdf.ln(4)
 
     _section("Input Parameters", input_params, value_color=(15, 23, 42))
-    _section("Results", results_dict, value_color=(29, 78, 216))
+    _section("Results", results_dict, value_color=(30, 58, 95))
 
     warnings = results_dict.get("_warnings") or []
     if warnings:
@@ -489,13 +489,13 @@ def _build_html_report(calc_title: str, input_params: dict, results_dict: dict) 
     )
     result_rows = "".join(
         f"<tr><td style='padding:6px 12px;color:#475569;'>{str(k).replace('_',' ').title()}</td>"
-        f"<td style='padding:6px 12px;font-weight:700;color:#1D4ED8;'>{v}</td></tr>"
+        f"<td style='padding:6px 12px;font-weight:700;color:#1E3A5F;'>{v}</td></tr>"
         for k, v in results_dict.items() if v is not None and k != "_warnings"
     )
     return f"""
     <html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f1f5f9;padding:24px;">
       <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;">
-        <div style="background:#1D4ED8;color:#fff;padding:20px 24px;">
+        <div style="background:#1E3A5F;color:#fff;padding:20px 24px;">
           <h2 style="margin:0;font-size:18px;">Paras Chemical Engineering Calc Suite</h2>
           <p style="margin:4px 0 0;color:#cbd5e1;font-size:13px;">{calc_title} - {timestamp}</p>
         </div>

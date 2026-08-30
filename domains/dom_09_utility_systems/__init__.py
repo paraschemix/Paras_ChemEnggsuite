@@ -1,3 +1,5 @@
-"""domains/dom_09_utility_systems — Plant Utilities, Energy & Power Generation. Not yet populated."""
+"""domains/dom_09_utility_systems — Plant Utilities, Energy & Power Generation.
+LIVE this release: Saturated Steam Properties, Flash Steam Percentage."""
+from .steam_engine import REGISTRY
 
-REGISTRY: dict = {}
+__all__ = ["REGISTRY"]

@@ -1,91 +1,76 @@
-# Paras Chemical Engineering Calc Suite — UX & Safety Messaging Update
+# Paras Chemical Engineering Calc Suite — v8: 40 Live Tools
 
-Builds on the Engine Expansion release (15 live tools across 5 domains).
-This round: blue/white theme, a validation-required caution banner on
-every tool, and cross-page navigation — plus a real bug found and fixed
-during verification, documented below rather than glossed over.
+**40 live tools now, up from 36.** First round since v7 focused purely on
+*deepening* domains rather than closing gaps — every one of the 4 new
+tools this round went into a domain that already had live content.
 
-## What's new
+## What's new this round
 
-**1. Blue-on-white theme, applied everywhere.** Because `inject_global_css()`
-is called by every single page, this was a one-file change
-(`utils/ui_components.py`) that now applies consistently across the
-landing page and all 12 domains — headings, sidebar, buttons, tabs, and
-status badges all switched from the prior teal/mint palette to blue
-(#1D4ED8 primary, #2563EB accent) on a white background. PDF report
-headers and HTML email templates updated to match (they had hardcoded
-hex colors, not variable references — found and fixed both instances).
+| Domain | New tools | Hand-verified reference value |
+|---|---|---|
+| 🔥 Heat Transfer (`dom_03`) | Cylindrical Pipe Insulation Heat Loss, Air-Cooled Exchanger (Fin-Fan) Air-Side Sizing | 79.28 Btu/hr-ft heat loss, 85.1°F surface temp; 78.36 ft2 face area |
+| 💧 Utility Systems (`dom_09`) | Cooling Tower Evaporation, Blowdown & Makeup | E=170 gpm, M=214.5 gpm at COC=5 |
+| 📡 Instrumentation & Control (`dom_10`) | Frequency Response (Bode Point) for FOPDT | \|G(jw)\|=1.789, phase=-32.29° at ω=0.05 rad/time |
 
-**2. "Validate before use" caution banner on every tool.** Added
-`render_caution_banner()`, called once per tool render inside
-`utils/runner.py`'s shared `render_domain_page()` — meaning it appears
-on every current and future tool automatically, with zero per-page or
-per-tool code required. It sits directly under the tool description,
-above the inputs, so it's seen before a result is generated, not after.
+## Two real bugs, found and fixed by testing
 
-**3. Cross-page navigation footer.** Added `render_domain_footer_nav()`,
-also called from the shared `render_domain_page()`, rendering links to
-all 11 other domains plus Home at the bottom of every page. Backed by a
-new single source of truth, `DOMAIN_PAGES` in `utils/tool_roadmap.py`
-(icon + label + page path for all 12 domains) — `app.py`'s domain cards
-and the footer nav both read from this one list now, removing a
-duplication risk that existed across the prior two releases.
+**1. Missing import, caught immediately on first run.** The new Cooling
+Tower tool used `run_validators` and `check_positive`, but
+`dom_09_utility_systems/steam_engine.py` had never needed those helpers
+before (the original 2 steam tools used inline checks) — so the import
+was never there. Running the verification script threw `NameError:
+name 'run_validators' is not defined` on the very first test call. Fixed
+by adding the import; re-verified all 4 new tools afterward, not just
+the one that broke.
 
-## A real bug, found and fixed during verification
-
-Initial implementation of the footer nav caused a `KeyError:
-'url_pathname'` crash on **every single page** when tested. Before
-"fixing" it, I checked whether this was an actual production bug or a
-testing-harness artifact — they require completely different fixes, and
-guessing wrong would have meant either shipping a broken feature or
-wasting effort removing working code.
-
-**Root cause:** `st.page_link()` needs Streamlit's multipage manifest to
-resolve a link target, and that manifest only exists when a page is
-reached through the real entrypoint (`app.py`). My test harness had been
-loading each `pages/*.py` file standalone via
-`AppTest.from_file('pages/01_Hydraulics.py')` — which is how every page
-in this project has been tested in every prior round, and worked fine
-until a page itself started calling `st.page_link()` (previously only
-`app.py` did). Loading a page standalone has no sibling-page context, so
-the link target lookup fails — a testing-harness limitation, not a
-production bug.
-
-**Verified by testing the correct way**: `AppTest.from_file('app.py')` →
-`at.switch_page('pages/01_Hydraulics.py')` → confirmed zero exceptions,
-confirming this works correctly in actual deployment (where `app.py` is
-always the entrypoint). Rewrote `.github/workflows/ci.yml` to use this
-`switch_page` pattern for every page test going forward — the prior
-CI file would have appeared to pass (it never tested cross-page
-`page_link` calls before this round) but would have started failing
-the moment this feature shipped, for a reason unrelated to the actual
-code being broken. Caught and fixed before that could happen.
+**2. A parsing bug in my own new bullet text — again.** I wrote "Cooling
+tower evaporation, blowdown, and drift loss calculator" as a roadmap
+key, not initially noticing this exact phrase already existed as a
+*source-taxonomy* bullet with the same comma-list construction that's
+broken the parser twice before (v6, v7). This time it wasn't inside
+parentheses — it's a plain "X, Y, and Z" list — so my previous fix
+(scanning for commas *inside parens*) wouldn't have caught it. Widened
+the corpus scan to catch comma-before-"and" list constructions generally,
+confirmed zero remaining instances, then fixed this one by removing the
+internal commas. Third time this class of bug has surfaced; the scan is
+now written to catch the broader pattern, not just the narrower one from
+before.
 
 ## Verification
 
-1. 35 files syntax-checked, zero errors.
-2. Landing page + all 12 pages re-tested via the corrected
-   `switch_page` navigation pattern — 0 exceptions.
-3. Caution banner and cross-page nav footer confirmed present via
-   markdown-content inspection on all 12 pages, not just visually assumed.
-4. All previously-verified live calculators (Pressure Drop, Orifice
-   Plate, FUG, Z-factor, WHSV, PSV Gas) re-confirmed producing correct
-   results through the corrected test pattern — same values as every
-   prior round, zero regression from the theme/banner/nav changes.
-5. CI workflow's exact steps run locally in full before being committed
-   — all pass, including the two new checks (nav footer presence,
-   corrected page-boot pattern).
+1. 42 files syntax-checked, zero errors.
+2. All 4 new functions hand-derived and hand-computed *before* any code
+   was written — insulation heat loss cross-checked two ways (heat loss
+   rate AND resulting surface temperature, both physically sensible:
+   ~85°F surface on a 300°F pipe with 2" insulation is a believable,
+   safe-to-touch result).
+3. Roadmap cross-referencing: 40/40 live tools confirmed, 0 duplicate
+   keys across 232 total entries.
+4. All 12 pages + all 4 new tools clicked through their actual rendered
+   pages via the `switch_page` pattern, each one explicitly selected via
+   its dropdown (not relying on tab-default ordering).
+5. CI workflow extended with 4 new tool checks, run locally in full
+   before being committed.
 
-## Files touched this round
+## Realistic roadmap, updated
 
-- `utils/ui_components.py` — theme colors, `render_caution_banner()`,
-  `render_domain_footer_nav()`
-- `utils/tool_roadmap.py` — added `DOMAIN_PAGES` shared list
-- `utils/runner.py` — wired both new render functions into the shared
-  page-rendering loop, added `page_path` parameter
-- `pages/*.py` (all 12) — one-line change each, passing `page_path=...`
-  into `render_domain_page()`
-- `.github/workflows/ci.yml` — rewritten to use `switch_page` correctly
+| Package | Live tools | Domains populated |
+|---|---|---|
+| v7 | 36 | 12 of 12 |
+| **v8 (this delivery)** | **40** | **12 of 12** |
+| v9 | ~55 | 12 of 12, deeper |
+| v10 | 100+ | full depth per domain |
+
+## Still open / natural next picks
+
+- Domain 6 (Process Safety): two-phase flashing relief (DIERS/Omega
+  method) — still the natural highest-value pick, deliberately deferred
+  again this round due to the complexity/verification-confidence tradeoff
+  flagged in v7.
+- Domain 8 (Solids Handling): only 2 tools — cyclone separator
+  efficiency (Lapple correlation) is a well-defined next addition.
+- Domain 11 (Economics): only 3 tools — IRR (via bisection root-finding,
+  building on the existing NPV tool) is a natural, low-risk extension.
 
 ## Running it
 
@@ -93,6 +78,3 @@ code being broken. Caught and fixed before that could happen.
 pip install -r requirements.txt
 streamlit run app.py
 ```
-
-Same plug-and-play protocol as before — nothing about adding new tools
-changed this round.

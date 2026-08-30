@@ -70,6 +70,11 @@ def render_domain_page(domain_title: str, description: str, registry: dict, icon
                         values[inp.name] = st.selectbox(
                             inp.display_label(), options=inp.options, key=f"{tool.key}_{inp.name}"
                         )
+                    elif inp.input_type == "text":
+                        values[inp.name] = st.text_input(
+                            inp.display_label(), value=str(inp.default_text or ""), help=inp.help or None,
+                            key=f"{tool.key}_{inp.name}",
+                        )
                     else:
                         kwargs = {}
                         if inp.min_value is not None:

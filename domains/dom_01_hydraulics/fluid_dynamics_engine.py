@@ -557,6 +557,102 @@ TOOL_COMPRESSOR = ToolSpec(
 )
 
 
+# =======================================================================
+# TOOL: EROSIONAL VELOCITY CHECK (API RP 14E)
+# =======================================================================
+
+def compute_erosional_velocity(values: dict) -> dict:
+    rho_lb_ft3 = values["rho_lb_ft3"]
+    c_constant = values["c_constant"]
+    actual_velocity_ft_s = values["actual_velocity_ft_s"]
+
+    has_error, has_warning, errors, warnings = run_validators(
+        check_positive(rho_lb_ft3, "Fluid density"), check_positive(c_constant, "C constant"),
+    )
+    if has_error:
+        raise ValueError("; ".join(errors))
+    if actual_velocity_ft_s < 0:
+        raise ValueError("Velocity cannot be negative.")
+
+    ve = c_constant / math.sqrt(rho_lb_ft3)
+    ratio = actual_velocity_ft_s / ve if ve > 0 else float("inf")
+    is_exceeded = actual_velocity_ft_s > ve
+
+    return {
+        "Erosional Velocity Limit (ft/s)": round(ve, 2),
+        "Actual Velocity (ft/s)": round(actual_velocity_ft_s, 2),
+        "Percent of Limit (%)": round(ratio * 100, 1),
+        "Status": "EXCEEDS limit" if is_exceeded else "Within limit",
+        "_warnings": warnings + (
+            ["Actual velocity exceeds the API RP 14E erosional limit - risk of erosion/corrosion damage, "
+             "especially at fittings, elbows, and tees. Consider a larger line size."]
+            if is_exceeded else []
+        ),
+    }
+
+
+TOOL_EROSIONAL_VELOCITY = ToolSpec(
+    key="hy_008",
+    title="Erosional Velocity Check (API RP 14E)",
+    category="Piping Systems & Flow Measurement",
+    description="Checks actual line velocity against the API RP 14E erosional velocity limit.",
+    inputs=[
+        InputSpec("rho_lb_ft3", "Fluid Density", default=50.0, min_value=0.01, unit="(lb/ft3)"),
+        InputSpec("c_constant", "C Constant", default=100.0, min_value=1.0,
+                   help="Typical: 100 (conservative, continuous service), up to 150-200 for clean, non-corrosive, intermittent service. Confirm against your company's piping specification."),
+        InputSpec("actual_velocity_ft_s", "Actual Velocity", default=12.0, min_value=0.0, unit="(ft/s)"),
+    ],
+    compute=compute_erosional_velocity,
+    formula_md=r"$$V_e = \dfrac{C}{\sqrt{\rho}}, \quad \rho\ \text{in lb/ft}^3,\ V_e\ \text{in ft/s}$$",
+    references=["API RP 14E - Recommended Practice for Design and Installation of Offshore Production Platform Piping Systems"],
+    assumptions=["C is a generic, conservative default - always confirm against your company's piping class/specification before final sizing."],
+)
+
+
+# =======================================================================
+# TOOL: MINIMUM LINE DIAMETER
+# =======================================================================
+
+def compute_minimum_line_diameter(values: dict) -> dict:
+    flow_gpm = values["flow_gpm"]
+    velocity_limit_ft_s = values["velocity_limit_ft_s"]
+
+    has_error, has_warning, errors, warnings = run_validators(
+        check_positive(flow_gpm, "Flow rate"), check_positive(velocity_limit_ft_s, "Velocity limit"),
+    )
+    if has_error:
+        raise ValueError("; ".join(errors))
+
+    q_ft3_s = (flow_gpm * 0.133681) / 60.0
+    area_ft2 = q_ft3_s / velocity_limit_ft_s
+    d_ft = math.sqrt((4 * area_ft2) / math.pi)
+    d_in = d_ft * 12.0
+
+    return {
+        "Flow (ft3/s)": round(q_ft3_s, 4),
+        "Required Area (ft2)": round(area_ft2, 5),
+        "Minimum Internal Diameter (in)": round(d_in, 3),
+        "_warnings": [],
+    }
+
+
+TOOL_MIN_LINE_DIAMETER = ToolSpec(
+    key="hy_009",
+    title="Minimum Line Diameter for a Velocity Limit",
+    category="Piping Systems & Flow Measurement",
+    description="Minimum pipe internal diameter to keep velocity at or below a target limit for a given flow rate.",
+    inputs=[
+        InputSpec("flow_gpm", "Flow Rate", default=500.0, min_value=0.01, unit="(USGPM)"),
+        InputSpec("velocity_limit_ft_s", "Velocity Limit", default=14.14, min_value=0.01, unit="(ft/s)",
+                   help="E.g. the erosional velocity limit from the tool above, or a company standard maximum line velocity."),
+    ],
+    compute=compute_minimum_line_diameter,
+    formula_md=r"$$D = \sqrt{\dfrac{4Q}{\pi V_{limit}}}$$",
+    references=["GPSA Engineering Data Book, Section 17 - Fluid Flow"],
+    assumptions=["Round up to the next available standard pipe schedule internal diameter."],
+)
+
+
 REGISTRY: dict[str, ToolSpec] = {
     TOOL_PRESSURE_DROP.key: TOOL_PRESSURE_DROP,
     TOOL_VALVE_LIQUID.key: TOOL_VALVE_LIQUID,
@@ -566,4 +662,6 @@ REGISTRY: dict[str, ToolSpec] = {
     TOOL_ORIFICE_PLATE.key: TOOL_ORIFICE_PLATE,
     TOOL_PUMP_BHP.key: TOOL_PUMP_BHP,
     TOOL_COMPRESSOR.key: TOOL_COMPRESSOR,
+    TOOL_EROSIONAL_VELOCITY.key: TOOL_EROSIONAL_VELOCITY,
+    TOOL_MIN_LINE_DIAMETER.key: TOOL_MIN_LINE_DIAMETER,
 }
