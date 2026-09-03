@@ -47,6 +47,10 @@ class InputSpec:
     options: Optional[list] = None  # required if input_type == "select"
     default_text: Optional[str] = None  # used instead of `default` when input_type == "text"
 
+    # --- v9 unit-conversion opt-in (both None = renders exactly as before, zero regression) ---
+    quantity_kind: Optional[str] = None    # e.g. "pressure", "temperature" - key into utils.unit_converter.QUANTITY_KINDS
+    canonical_unit: Optional[str] = None   # the unit label (from that quantity kind's options) this tool's compute() actually expects
+
     def display_label(self) -> str:
         return f"{self.label} {self.unit}".strip() if self.unit else self.label
 

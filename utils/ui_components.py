@@ -132,7 +132,7 @@ def inject_global_css() -> None:
             padding: 2px 8px; border-radius: 9999px; display: inline-block;
         }}
         .status-soon {{
-            background: #f1f5f9; color: #64748b; font-size: 0.7rem; font-weight: 700;
+            background: #f1f5f9; color: #475569; font-size: 0.7rem; font-weight: 700;
             padding: 2px 8px; border-radius: 9999px; display: inline-block;
         }}
 
@@ -253,6 +253,7 @@ def render_domain_footer_nav(current_page_path: str = "") -> None:
             st.page_link(path, label=label, use_container_width=True)
 
     st.page_link("app.py", label="🏠 Home", use_container_width=True)
+    st.page_link("pages/13_🔄_Unit_Converter.py", label="🔄 Unit Converter", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 

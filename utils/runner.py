@@ -23,6 +23,7 @@ from utils.ui_components import (
     render_engineering_basis, render_report_widget, render_email_widget,
     render_caution_banner, render_domain_footer_nav,
 )
+from utils.unit_converter import get_unit_options, convert_to_canonical
 
 
 def render_domain_page(domain_title: str, description: str, registry: dict, icon: str = "", page_path: str = "") -> None:
@@ -83,10 +84,36 @@ def render_domain_page(domain_title: str, description: str, registry: dict, icon
                             kwargs["max_value"] = inp.max_value
                         if inp.step is not None:
                             kwargs["step"] = inp.step
-                        values[inp.name] = st.number_input(
-                            inp.display_label(), value=inp.default, help=inp.help or None,
-                            key=f"{tool.key}_{inp.name}", **kwargs,
-                        )
+
+                        if inp.quantity_kind and inp.canonical_unit:
+                            # v9 unit-aware input: paired number field + unit
+                            # dropdown. The number is stored/entered in
+                            # whatever unit the dropdown says; conversion to
+                            # this tool's canonical unit happens right here,
+                            # so `values[inp.name]` is ALWAYS in canonical
+                            # units by the time compute() sees it - compute()
+                            # functions are completely unaware this exists.
+                            unit_options = get_unit_options(inp.quantity_kind)
+                            sub_cols = st.columns([3, 2])
+                            with sub_cols[0]:
+                                raw_value = st.number_input(
+                                    inp.label, value=inp.default, help=inp.help or None,
+                                    key=f"{tool.key}_{inp.name}", **kwargs,
+                                )
+                            with sub_cols[1]:
+                                default_unit_index = unit_options.index(inp.canonical_unit) if inp.canonical_unit in unit_options else 0
+                                selected_unit = st.selectbox(
+                                    "Unit", options=unit_options, index=default_unit_index,
+                                    key=f"{tool.key}_{inp.name}_unit", label_visibility="collapsed",
+                                )
+                            values[inp.name] = convert_to_canonical(
+                                raw_value, inp.quantity_kind, selected_unit, inp.canonical_unit
+                            )
+                        else:
+                            values[inp.name] = st.number_input(
+                                inp.display_label(), value=inp.default, help=inp.help or None,
+                                key=f"{tool.key}_{inp.name}", **kwargs,
+                            )
 
             st.markdown("")
             calculate = st.button("🧮 Calculate", type="primary", key=f"{tool.key}_calc_btn")
