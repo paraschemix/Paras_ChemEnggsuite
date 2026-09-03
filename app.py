@@ -83,6 +83,8 @@ with st.sidebar:
     render_brand_header(compact=True)
     render_unit_toggle()
     st.caption(f"{TOTAL_LIVE} of {TOTAL_ROADMAP} tools live across {len(DOMAIN_REGISTRIES)} domains.")
+    st.divider()
+    st.page_link("pages/13_🔄_Unit_Converter.py", label="🔄 Unit Converter", use_container_width=True)
 
 # ---------------------------------------------------------------------
 # Main landing content

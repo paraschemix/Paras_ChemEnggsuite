@@ -1,76 +1,125 @@
-# Paras Chemical Engineering Calc Suite — v8: 40 Live Tools
+# Paras Chemical Engineering Calc Suite — v9 Phase 1: Unit Converter Infrastructure
 
-**40 live tools now, up from 36.** First round since v7 focused purely on
-*deepening* domains rather than closing gaps — every one of the 4 new
-tools this round went into a domain that already had live content.
+This round tackled the piece of the v9 spec you flagged as highest
+priority *and* highest risk: a universal SI ↔ US Customary unit
+conversion system. Still 40 live tools — this round is infrastructure
+and one retrofit, not new domain content.
 
-## What's new this round
+## What's actually done vs. what the full v9 spec asked for
 
-| Domain | New tools | Hand-verified reference value |
-|---|---|---|
-| 🔥 Heat Transfer (`dom_03`) | Cylindrical Pipe Insulation Heat Loss, Air-Cooled Exchanger (Fin-Fan) Air-Side Sizing | 79.28 Btu/hr-ft heat loss, 85.1°F surface temp; 78.36 ft2 face area |
-| 💧 Utility Systems (`dom_09`) | Cooling Tower Evaporation, Blowdown & Makeup | E=170 gpm, M=214.5 gpm at COC=5 |
-| 📡 Instrumentation & Control (`dom_10`) | Frequency Response (Bode Point) for FOPDT | \|G(jw)\|=1.789, phase=-32.29° at ω=0.05 rad/time |
+The v9 spec's mandate is a genuinely large program (global contrast
+audit, breadcrumb nav, dual-persona interpretation text on every tool,
+3 new reference-data domains, a new integrated hydraulic-chain tool,
+*and* a full unit-system retrofit across all 40 existing tools). Given
+you prioritized the unit converter, this round is scoped to that,
+done properly, rather than a shallow pass across everything. See
+"Deferred to later rounds" below for the rest, unchanged in priority
+from what was flagged before.
 
-## Two real bugs, found and fixed by testing
+## 1. Unit conversion engine (`utils/unit_converter.py`)
 
-**1. Missing import, caught immediately on first run.** The new Cooling
-Tower tool used `run_validators` and `check_positive`, but
-`dom_09_utility_systems/steam_engine.py` had never needed those helpers
-before (the original 2 steam tools used inline checks) — so the import
-was never there. Running the verification script threw `NameError:
-name 'run_validators' is not defined` on the very first test call. Fixed
-by adding the import; re-verified all 4 new tools afterward, not just
-the one that broke.
+Built on `pint` (a mature, independently-tested unit library) rather
+than hand-rolled conversion factors — 9 quantity kinds covering
+pressure, temperature, length, density, velocity, dynamic viscosity,
+volumetric flow, mass flow, and power/heat duty.
 
-**2. A parsing bug in my own new bullet text — again.** I wrote "Cooling
-tower evaporation, blowdown, and drift loss calculator" as a roadmap
-key, not initially noticing this exact phrase already existed as a
-*source-taxonomy* bullet with the same comma-list construction that's
-broken the parser twice before (v6, v7). This time it wasn't inside
-parentheses — it's a plain "X, Y, and Z" list — so my previous fix
-(scanning for commas *inside parens*) wouldn't have caught it. Widened
-the corpus scan to catch comma-before-"and" list constructions generally,
-confirmed zero remaining instances, then fixed this one by removing the
-internal commas. Third time this class of bug has surfaced; the scan is
-now written to catch the broader pattern, not just the narrower one from
-before.
+**Verified against 10 known reference conversions** before touching any
+tool, including the trickiest case (temperature — an offset, not purely
+multiplicative, unit system): 300°F → 148.889°C, 0°C → 32°F, both exact.
+
+**One real caveat found during testing, not glossed over:** `psi` and
+`psia` currently convert as identical units in this engine — this
+converter does unit-of-measure conversion only (psi↔kPa↔bar), not
+gauge↔absolute conversion, which needs local atmospheric pressure as an
+extra input. Documented directly in the code and flagged live in the
+Unit Converter page's UI when pressure is selected, rather than left as
+a silent trap.
+
+## 2. Architecture: retrofit without touching any of the 40 verified `compute()` functions
+
+This was the actual hard design constraint. Every domain engine's
+`compute()` function keeps working in whatever unit system it was
+already verified against — **nothing about the physics changed**.
+`InputSpec` gained two new *optional* fields (`quantity_kind`,
+`canonical_unit`); when unset (the default, true for ~145 of the
+suite's ~150 input fields right now), a field renders exactly as
+before. When set, `utils/runner.py` renders a paired number+unit
+dropdown, converts to the tool's existing canonical unit, and only
+*then* hands the value to `compute()` — which never knows the
+conversion layer exists.
+
+**Pilot retrofit:** Hydraulics → Single-Phase Pressure Drop, covering 3
+different quantity kinds (density, velocity, length) across its 4 main
+inputs. Verified two ways:
+- Canonical-unit inputs reproduce the exact long-standing result
+  (Re=200,000, ΔP=37,330.4 Pa) — zero regression.
+- The *same physical scenario* re-entered in imperial units (lb/ft³,
+  ft/s, ft) through the actual unit dropdowns produces the same
+  physics (Re=199,998.3 vs. 200,000 — the tiny gap is my 5-digit manual
+  imperial rounding when typing the test, not a conversion error).
+
+## 3. Standalone Unit Converter (new page, not a 13th physics domain)
+
+Per your request to "make unit conversion another domain" — implemented
+as `pages/13_🔄_Unit_Converter.py`, a general-purpose converter built
+directly on the same tested engine. **Deliberately not added to
+`utils/tool_roadmap.py`'s `ROADMAP`/`DOMAIN_PAGES`** — it's a utility,
+not an engineering calculation, so it doesn't participate in the "all
+12 domains have a live tool" invariant the CI already checks. Linked
+from the sidebar on the landing page and from every domain page's
+footer nav instead.
+
+## 4. WCAG contrast — audited, not just claimed
+
+Computed actual WCAG contrast ratios (not assumed) for 9 key color
+pairs across the current navy/white theme. **8 of 9 already passed**
+comfortably — the theme from prior rounds was already in good shape.
+The one failure (`status-soon` "Coming Soon" badge text, 4.34:1 vs. the
+4.5:1 required for small text) was fixed by darkening the gray to
+`#475569` (now 6.92:1). Re-audited after the fix: all 9 pairs pass.
 
 ## Verification
 
-1. 42 files syntax-checked, zero errors.
-2. All 4 new functions hand-derived and hand-computed *before* any code
-   was written — insulation heat loss cross-checked two ways (heat loss
-   rate AND resulting surface temperature, both physically sensible:
-   ~85°F surface on a 300°F pipe with 2" insulation is a believable,
-   safe-to-touch result).
-3. Roadmap cross-referencing: 40/40 live tools confirmed, 0 duplicate
-   keys across 232 total entries.
-4. All 12 pages + all 4 new tools clicked through their actual rendered
-   pages via the `switch_page` pattern, each one explicitly selected via
-   its dropdown (not relying on tab-default ordering).
-5. CI workflow extended with 4 new tool checks, run locally in full
-   before being committed.
+1. 44 files syntax-checked, zero errors.
+2. Unit converter tested against 10 independent reference conversions
+   across all 9 quantity kinds, including the offset-unit temperature
+   edge case.
+3. Pilot retrofit tested via `AppTest` two ways (canonical units,
+   equivalent imperial units) — same physics, confirming the conversion
+   layer works without altering any verified calculation.
+4. **Full regression spot-check across all 12 domains** — one
+   representative tool per domain clicked through its actual page,
+   confirming the shared-file changes (`InputSpec`, `runner.py`,
+   `ui_components.py`) broke nothing elsewhere in the suite.
+5. Standalone Unit Converter page tested via `AppTest`.
+6. WCAG contrast computed (not assumed) before and after the one fix.
+7. CI workflow extended with 3 new checks (converter page, reference
+   conversions, pilot tool + unit-selector count), all run locally in
+   full before being committed.
 
-## Realistic roadmap, updated
+## Deferred to later rounds (stated plainly, matching prior rounds' practice)
 
-| Package | Live tools | Domains populated |
-|---|---|---|
-| v7 | 36 | 12 of 12 |
-| **v8 (this delivery)** | **40** | **12 of 12** |
-| v9 | ~55 | 12 of 12, deeper |
-| v10 | 100+ | full depth per domain |
-
-## Still open / natural next picks
-
-- Domain 6 (Process Safety): two-phase flashing relief (DIERS/Omega
-  method) — still the natural highest-value pick, deliberately deferred
-  again this round due to the complexity/verification-confidence tradeoff
-  flagged in v7.
-- Domain 8 (Solids Handling): only 2 tools — cyclone separator
-  efficiency (Lapple correlation) is a well-defined next addition.
-- Domain 11 (Economics): only 3 tools — IRR (via bisection root-finding,
-  building on the existing NPV tool) is a natural, low-risk extension.
+- **Retrofitting the remaining ~145 input fields** across the other 39
+  tools with `quantity_kind`/`canonical_unit` — the pattern is proven;
+  applying it broadly is mechanical but needs per-field verification
+  like the pilot got, which is real, non-trivial effort at this
+  project's standard.
+- **Breadcrumb navigation** (`Home > Domain > Tool`) — not done this
+  round; the existing footer cross-nav and sidebar Home/Converter links
+  partially serve this need in the meantime.
+- **Dual-persona "Engineering Impact & Interpretation" auto-summary
+  box** on every tool — not started.
+- **Reference-data domains** (CEPCI history, U-value tables, tray
+  vendor/system factors) — not started. Flagging in advance: CEPCI
+  specifically updates monthly and I have only moderate confidence in
+  precise historical values from memory — when this is built, expect it
+  shipped as a small set of well-known textbook reference points with an
+  explicit "verify against the current published index" caveat, not a
+  large precise historical table.
+- **Domain 9 Integrated Pump & Control Valve Hydraulic Chain tool** —
+  not started; all the underlying sub-calculations (friction loss, TDH,
+  NPSH, Cv sizing) already exist verified elsewhere in the suite and
+  would be composed into one chained tool.
 
 ## Running it
 
@@ -78,3 +127,5 @@ before.
 pip install -r requirements.txt
 streamlit run app.py
 ```
+
+New dependency this round: `pint>=0.24`.
