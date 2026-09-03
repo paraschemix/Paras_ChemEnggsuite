@@ -91,9 +91,29 @@ def inject_global_css() -> None:
             font-size: 20px; font-weight: 800; color: {PRIMARY_TEAL}; flex-shrink: 0;
         }}
 
-        h1 {{ color: {PRIMARY_TEAL}; font-weight: 800; font-size: 2rem; word-wrap: break-word; }}
-        h2, h3 {{ color: {PRIMARY_TEAL}; font-weight: 700; }}
-        p, .stMarkdown p {{ color: {TEXT_BODY}; }}
+        /* !important on headings/body text: fallback layer in case a visitor's
+           browser ignores .streamlit/config.toml (cached session, embedded
+           iframe, etc). Without !important these lost specificity battles
+           against Streamlit's dark-theme defaults, going near-invisible on
+           our forced-white background — the bug seen on mobile dark mode. */
+        h1, .stMarkdown h1 {{ color: {PRIMARY_TEAL} !important; font-weight: 800; font-size: 2rem; word-wrap: break-word; }}
+        h2, h3, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5 {{ color: {PRIMARY_TEAL} !important; font-weight: 700; }}
+        p, .stMarkdown p, .stMarkdown li, label, .stMarkdown {{ color: {TEXT_BODY} !important; }}
+
+        /* Dark-theme widget chrome hardening: selectbox / number_input /
+           text_input containers default to dark-theme black backgrounds if
+           the config.toml theme lock is bypassed. Force light chrome so no
+           orphaned black widget ever sits on the white page again. */
+        div[data-baseweb="select"] > div, div[data-baseweb="select"] * {{
+            background-color: #ffffff !important; color: {TEXT_BODY} !important;
+            border-color: #ced4da !important;
+        }}
+        div[data-testid="stNumberInput"] input, div[data-testid="stTextInput"] input {{
+            background-color: #ffffff !important; color: {TEXT_BODY} !important;
+            border: 1px solid #ced4da !important;
+        }}
+        ul[data-testid="stSelectboxVirtualDropdown"] {{ background-color: #ffffff !important; }}
+        ul[data-testid="stSelectboxVirtualDropdown"] li {{ color: {TEXT_BODY} !important; }}
 
         div[data-testid="stMetric"] {{
             background: {CARD_BG}; border: 1px solid #e2e8f0; border-radius: 16px;
