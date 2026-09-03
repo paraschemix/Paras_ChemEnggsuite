@@ -1,0 +1,17 @@
+# Locks the app to the light theme regardless of the visitor's OS/browser
+# dark-mode preference. Without this, Streamlit auto-detects device theme;
+# our custom navy-on-white CSS in utils/ui_components.py only overrides
+# .stApp background + a subset of selectors, so dark-mode visitors saw
+# invisible (near-white-on-white) headings and orphaned dark widget chrome.
+# This file is the primary fix; the !important hardening in
+# inject_global_css() is the second line of defense.
+[theme]
+base = "light"
+primaryColor = "#2C5282"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F4F6F9"
+textColor = "#1a252f"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
