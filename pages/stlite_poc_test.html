@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Paras ChemEngg Suite — stlite Proof of Concept</title>
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/@stlite/browser@0.85.1/build/stlite.css"
+/>
+<style>
+  body { margin: 0; font-family: sans-serif; background:#0e1117; }
+  #banner {
+    background:#1a2332; color:#fff; padding:14px 20px; font-size:14px;
+    border-bottom: 2px solid #2d6cdf;
+  }
+  #banner b { color:#5b9bff; }
+  #root { height: calc(100vh - 54px); }
+</style>
+</head>
+<body>
+  <div id="banner">
+    <b>stlite proof-of-concept</b> — running <b>hy_011 (NPSHa calculator)</b> and a <b>pint</b> unit-conversion
+    dependency test 100% inside your browser via WebAssembly. First load fetches the Python runtime (~30-50 MB,
+    one time, then cached) — if this page works on a corporate PC where the normal hosted app fails, that
+    confirms the WebSocket-blocking theory and stlite as a viable fix.
+  </div>
+  <div id="root"></div>
+
+  <script type="module">
+    import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@0.85.1/build/stlite.js";
+
+    mount(
+      {
+        requirements: ["pint"],
+        entrypoint: "streamlit_app.py",
+        files: {
+          "streamlit_app.py": `
+import streamlit as st
+import pint
+import math
+
+st.set_page_config(page_title="Paras ChemEngg Suite - stlite Test", layout="centered")
+st.title("Paras ChemEngg Suite")
+st.caption("stlite proof-of-concept build — running fully client-side, no server round-trip.")
+
+tab1, tab2 = st.tabs(["hy_011: NPSHa Calculator", "pint dependency test"])
+
+with tab1:
+    st.subheader("NPSH Available - Calculated from System Parameters")
+    st.caption("This is the real hy_011 tool from the live repo, ported unmodified.")
+
+    p_source = st.number_input("Source Vessel Pressure, absolute (psia)", value=14.7, min_value=0.01)
+    elevation = st.number_input("Static Elevation of Liquid Above Pump CL (ft)", value=10.0)
+    friction_loss = st.number_input("Suction Line Friction Loss (ft)", value=2.0, min_value=0.0)
+    vapor_pressure = st.number_input("Vapor Pressure at Pumping Temperature (psia)", value=0.5, min_value=0.001)
+    sg = st.number_input("Specific Gravity", value=1.0, min_value=0.01, step=0.01)
+
+    if st.button("Calculate NPSHa"):
+        if vapor_pressure >= p_source:
+            st.warning("Vapor pressure exceeds source pressure - fluid is at or above its boiling point.")
+
+        PSI_TO_FT_WATER = 2.31
+        pressure_head = (p_source - vapor_pressure) * PSI_TO_FT_WATER / sg
+        npsha = pressure_head + elevation - friction_loss
+
+        st.metric("NPSH Available, NPSHa (ft)", round(npsha, 2))
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Pressure Head Term (ft)", round(pressure_head, 2))
+        col2.metric("Elevation Term (ft)", round(elevation, 2))
+        col3.metric("Friction Loss Term (ft)", round(-friction_loss, 2))
+
+        if npsha <= 0:
+            st.error("Calculated NPSHa is zero or negative - pump will cavitate immediately.")
+        elif npsha < 10:
+            st.warning("NPSHa below 10 ft is tight for most centrifugal pumps.")
+        else:
+            st.success("NPSHa looks reasonable - verify margin against vendor NPSHr curve per ANSI/HI 9.6.1.")
+
+with tab2:
+    st.subheader("pint Dependency Test")
+    st.caption("Confirms the pint unit-conversion library (used across your unit converter hub) loads and works correctly inside Pyodide/WebAssembly.")
+
+    ureg = pint.UnitRegistry()
+    st.success("pint imported and UnitRegistry created successfully inside the browser.")
+
+    val = st.number_input("Pressure value", value=100.0)
+    from_unit = st.selectbox("From unit", ["psi", "bar", "kPa", "atm"], index=0)
+    to_unit = st.selectbox("To unit", ["bar", "psi", "kPa", "atm"], index=0)
+
+    try:
+        q = val * ureg(from_unit)
+        converted = q.to(to_unit)
+        st.metric(f"{val} {from_unit} =", f"{converted.magnitude:.4f} {to_unit}")
+    except Exception as e:
+        st.error(f"Conversion failed: {e}")
+`
+        },
+      },
+      document.getElementById("root")
+    );
+  </script>
+</body>
+</html>
