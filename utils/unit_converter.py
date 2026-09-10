@@ -29,6 +29,22 @@ _ureg = pint.UnitRegistry()
 _ureg.default_format = "~P"
 
 # ---------------------------------------------------------------------
+# Custom unit definitions (v9 pitfalls fixed here, not with raw pint
+# defaults - see file docstring / project memory for context):
+#   - pint's built-in "mil" is an ANGULAR unit (1/6400 revolution,
+#     dimensionless), not thousandths-of-an-inch. Defining a distinct
+#     name avoids silently colliding with that built-in.
+#   - pint's built-in "barrel" is US liquid barrel (119.24 L), not the
+#     oilfield barrel (158.987 L) process engineers mean by "bbl".
+#   - "1e6*Btu/hour" is not a valid pint unit expression on its own
+#     (arithmetic-prefixed strings like this raise/misparse) - it needs
+#     a proper named unit definition instead.
+# ---------------------------------------------------------------------
+_ureg.define("mil_thou = 0.001 * inch = mil_th")
+_ureg.define("oil_bbl = 158.987 * liter = obbl")
+_ureg.define("mmbtu_per_hour = 1e6 * Btu / hour = MMBtuh")
+
+# ---------------------------------------------------------------------
 # Quantity kind registry: kind_key -> { "options": [(label, pint_unit), ...] }
 # `pint_unit` strings must be valid pint unit expressions.
 # ---------------------------------------------------------------------
@@ -84,10 +100,134 @@ QUANTITY_KINDS = {
     },
     "power_heat_duty": {
         "options": [
-            ("Btu/hr", "Btu/hour"), ("kW", "kilowatt"), ("hp", "horsepower"), ("MMBtu/hr", "1e6*Btu/hour"),
+            ("Btu/hr", "Btu/hour"), ("kW", "kilowatt"), ("hp", "horsepower"),
+            ("MMBtu/hr", "mmbtu_per_hour"),  # fixed: was invalid "1e6*Btu/hour" string
         ],
     },
+    # -------------------------------------------------------------
+    # v10 additions below
+    # -------------------------------------------------------------
+    "area": {
+        "options": [
+            ("m2", "meter**2"), ("ft2", "ft**2"), ("in2", "inch**2"), ("cm2", "cm**2"),
+        ],
+    },
+    "volume": {
+        "options": [
+            ("m3", "meter**3"), ("ft3", "ft**3"), ("L", "liter"), ("USgal", "gallon"),
+            ("oil_bbl", "oil_bbl"),
+        ],
+    },
+    # Heat transfer datasheet quantities
+    "heat_transfer_coeff": {
+        "options": [
+            ("W/m2-K", "watt/(meter**2*kelvin)"), ("Btu/hr-ft2-degF", "Btu/(hour*ft**2*degF)"),
+        ],
+    },
+    "fouling_resistance": {
+        "options": [
+            ("m2-K/W", "meter**2*kelvin/watt"), ("hr-ft2-degF/Btu", "hour*ft**2*degF/Btu"),
+        ],
+    },
+    "thermal_conductivity": {
+        "options": [
+            ("W/m-K", "watt/(meter*kelvin)"), ("Btu/hr-ft-degF", "Btu/(hour*ft*degF)"),
+        ],
+    },
+    "heat_flux": {
+        "options": [
+            ("W/m2", "watt/meter**2"), ("Btu/hr-ft2", "Btu/(hour*ft**2)"),
+        ],
+    },
+    # Thermodynamic properties
+    "specific_heat": {
+        "options": [
+            ("kJ/kg-K", "kilojoule/(kg*kelvin)"), ("Btu/lb-degF", "Btu/(lb*degF)"),
+        ],
+    },
+    "enthalpy_specific": {
+        "options": [
+            ("kJ/kg", "kilojoule/kg"), ("Btu/lb", "Btu/lb"), ("kcal/kg", "kilocalorie/kg"),
+        ],
+    },
+    "molar_flow": {
+        "options": [
+            ("kmol/hr", "kmol/hour"), ("lbmol/hr", "lbmol/hour"), ("mol/s", "mol/second"),
+        ],
+    },
+    # Fluid properties
+    "viscosity_kinematic": {
+        "options": [
+            ("cSt", "mm**2/second"), ("m2/s", "meter**2/second"), ("ft2/s", "ft**2/second"),
+        ],
+    },
+    "surface_tension": {
+        "options": [
+            ("N/m", "newton/meter"), ("dyn/cm", "dyne/cm"), ("lbf/ft", "lbf/ft"),
+        ],
+    },
+    # Electrical
+    "electrical_power": {
+        "options": [
+            ("kW", "kilowatt"), ("hp", "horsepower"), ("MW", "megawatt"),
+        ],
+    },
+    "voltage": {
+        "options": [
+            ("V", "volt"), ("kV", "kilovolt"),
+        ],
+    },
+    # Corrosion rate
+    "corrosion_rate": {
+        "options": [
+            ("mm/yr", "mm/year"), ("mpy", "mil_thou/year"),  # mpy = mils per year, thousandths-of-inch (NOT angular mil)
+        ],
+    },
+    # Piping pressure gradient
+    "pressure_gradient": {
+        "options": [
+            ("kPa/m", "kPa/meter"), ("psi/ft", "psi/ft"), ("bar/100m", "bar/(100*meter)"),
+        ],
+    },
+    # Oilfield barrels (flow and volume)
+    "flow_oilfield": {
+        "options": [
+            ("bbl/day", "oil_bbl/day"), ("bbl/hr", "oil_bbl/hour"), ("m3/hr", "meter**3/hour"),
+        ],
+    },
+    # Gas reference-condition volumetric flow functions:
+    #   Normal   = 0 degC,  1 atm   (Nm3/hr)
+    #   Standard-ISO = 15 degC, 1 atm  (Sm3/hr, ISO 13443)
+    #   Standard-US  = 60 degF, 14.696 psia (SCFM/SCFH)
+    # These are reference-condition-tagged volumetric flows, not a pure
+    # unit conversion (they depend on the reference T/P convention used),
+    # so they are exposed as dedicated helper functions below rather than
+    # folded into QUANTITY_KINDS' simple linear-factor table.
 }
+
+# Gas reference conditions: (temperature_K, pressure_Pa)
+GAS_REFERENCE_CONDITIONS = {
+    "normal": {"label": "Normal (0°C, 1 atm)", "T_K": 273.15, "P_Pa": 101325.0},
+    "standard_iso": {"label": "Standard-ISO (15°C, 1 atm)", "T_K": 288.15, "P_Pa": 101325.0},
+    "standard_us": {"label": "Standard-US (60°F, 14.696 psia)", "T_K": 288.7056, "P_Pa": 101325.0},
+}
+
+
+def convert_gas_reference_flow(value: float, from_ref: str, to_ref: str) -> float:
+    """Converts a volumetric gas flow reported at one reference condition
+    (Nm3/hr, Sm3/hr-ISO, SCFM, etc.) to the equivalent flow at another
+    reference condition, via the ideal gas law (same mass/mole flow):
+        V2 = V1 * (P1/P2) * (T2/T1)
+    Note this converts between reference CONVENTIONS only, at matching
+    volumetric units (e.g. both in m3/hr, or both in ft3, on either
+    side) - it does not itself change m3 to ft3; combine with the
+    `volume`/`flow_volumetric` kinds above for that.
+    """
+    if from_ref == to_ref:
+        return value
+    ref1 = GAS_REFERENCE_CONDITIONS[from_ref]
+    ref2 = GAS_REFERENCE_CONDITIONS[to_ref]
+    return value * (ref1["P_Pa"] / ref2["P_Pa"]) * (ref2["T_K"] / ref1["T_K"])
 
 
 def get_unit_options(quantity_kind: str) -> list[str]:

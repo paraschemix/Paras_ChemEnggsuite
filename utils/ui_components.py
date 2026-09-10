@@ -274,6 +274,21 @@ def render_domain_footer_nav(current_page_path: str = "") -> None:
 
     st.page_link("app.py", label="🏠 Home", use_container_width=True)
     st.page_link("pages/13_🔄_Unit_Converter.py", label="🔄 Unit Converter", use_container_width=True)
+
+    # Domain-filtered link into the Wiki (page 14) - matches this page's
+    # own DOMAIN_LABELS entry so "Related Wiki articles" actually filters
+    # to relevant content rather than dumping the visitor into everything.
+    from utils.tool_roadmap import DOMAIN_PAGES as _DP
+    _current_label = next((label for label, path in _DP if path == current_page_path), None)
+    if _current_label:
+        st.page_link(
+            "pages/14_📚_Wiki_KnowHow.py",
+            label="📚 Related Wiki articles",
+            use_container_width=True,
+            query_params={"domain": _current_label},
+        )
+    else:
+        st.page_link("pages/14_📚_Wiki_KnowHow.py", label="📚 Wiki / Know-How", use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 

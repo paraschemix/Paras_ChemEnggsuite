@@ -215,7 +215,12 @@ _DOMAIN_PREFIX_MAP = {
 # domain-agnostic).
 _LIVE_TOOL_KEY_MAP = {
     "Liquid pipe sizing (Darcy-Weisbach)": "hy_001",
-    "control valve sizing for liquids/gases/steam (ISA-75.01 standard)": "hy_002ab",
+    # NOTE: this taxonomy bullet is covered by two separate live tools
+    # (liquid Cv and gas/vapor Cv) rather than one combined tool. A
+    # single bullet-title can only map to one key via this dict, so the
+    # split is resolved just below in _build_roadmap() via
+    # _SPLIT_BULLET_EXTRA_KEYS instead of here.
+    "control valve sizing for liquids/gases/steam (ISA-75.01 standard)": "hy_002a",
     "Net Positive Suction Head (NPSHa/NPSHr) margin estimator": "hy_003",
     "Water hammer / surge pressure wave analyzer": "hy_006",
     "orifice plate differential pressure calculator (ISO 5167)": "hy_007",
@@ -257,6 +262,34 @@ _LIVE_TOOL_KEY_MAP = {
 }
 
 
+# v9 tools shipped beyond the original source taxonomy (same situation as
+# eq_001/eq_002/en_001/en_002/ht_003/ht_004/ut_003/ic_003 above — implemented
+# and REGISTRY-live, but with no bullet-list entry to match by title). Added
+# directly as RoadmapEntry tuples: (key, title, domain_label).
+_NEW_V9_TOOL_ENTRIES = [
+    # hy_002b: the "control valve sizing for liquids/gases/steam" taxonomy
+    # bullet is implemented as two live tools (hy_002a liquid Cv, hy_002b
+    # gas/vapor Cv). hy_002a is matched via _LIVE_TOOL_KEY_MAP above by
+    # bullet title; hy_002b has no bullet title of its own, so it's added
+    # here the same way as the other post-taxonomy v9/v10 tools.
+    ("hy_002b", "Control Valve Sizing - Gas/Vapor Cv (ISA-75.01)", DOMAIN_LABELS[1]),
+    ("hy_010", "Gas Pipeline Sizing — Weymouth / Panhandle A / Panhandle B", DOMAIN_LABELS[1]),
+    ("ht_005", "Cooling Tower Thermal Rating — Merkel NTU (KaV/L)", DOMAIN_LABELS[3]),
+    ("ht_006", "Cooling Water Scaling/Corrosion Index (LSI / RSI)", DOMAIN_LABELS[3]),
+    ("en_003", "Fixed-Roof Tank VOC Emissions (AP-42 Ch.7.1 Standing + Working Loss)", DOMAIN_LABELS[12]),
+    ("ps_010", "Tank Bund / Dike Capacity Sizing (NFPA 30)", DOMAIN_LABELS[6]),
+    ("ps_011", "Fire Case - Wetted Vessel Relief Load (API 521)", DOMAIN_LABELS[6]),
+    ("ps_012", "Fire Case - Gas/Non-Wetted Vessel Relief Load (API 521)", DOMAIN_LABELS[6]),
+    ("ps_013", "Blocked Discharge Relief Load", DOMAIN_LABELS[6]),
+    ("ps_014", "Thermal Expansion of Trapped Liquid", DOMAIN_LABELS[6]),
+    ("ps_015", "Heat Exchanger Tube Rupture Relief Load", DOMAIN_LABELS[6]),
+    ("ps_016", "Two-Phase Relief Sizing - Omega Method (Leung/HEM)", DOMAIN_LABELS[6]),
+    ("ps_017", "API 526 Standard Orifice Letter Selector", DOMAIN_LABELS[6]),
+    ("ps_018", "Flare Header Backpressure & Mach Number Check", DOMAIN_LABELS[6]),
+    ("ps_019", "Flare KO Drum Sizing (Souders-Brown)", DOMAIN_LABELS[6]),
+]
+
+
 def _build_roadmap() -> list[RoadmapEntry]:
     entries = []
     counter = 1
@@ -272,6 +305,9 @@ def _build_roadmap() -> list[RoadmapEntry]:
                 safe_title = tool_title.replace('"', "'")
                 entries.append(RoadmapEntry(key, counter, safe_title, label))
                 counter += 1
+    for key, title, label in _NEW_V9_TOOL_ENTRIES:
+        entries.append(RoadmapEntry(key, counter, title, label))
+        counter += 1
     return entries
 
 
