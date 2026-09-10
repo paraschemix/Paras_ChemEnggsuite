@@ -5,3 +5,5 @@ pandas>=2.2
 plotly>=5.22
 fpdf2>=2.7
 pint>=0.24
+requests>=2.32
+PyYAML>=6.0
